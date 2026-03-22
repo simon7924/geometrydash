@@ -129,9 +129,10 @@ export const GAME_MODES = {
         name: 'robot',
         // Similar to cube but with variable jump height
         gravity: 1800,
-        minJumpVelocity: -400,            // Tap jump (short)
-        maxJumpVelocity: -700,            // Hold jump (tall)
-        jumpHoldTime: 0.25,               // Max seconds to hold for full jump
+        minJumpVelocity: -280,            // Tap jump (short)
+        maxJumpVelocity: -480,            // Hold jump (tall)
+        jumpHoldTime: 0.35,               // Max seconds to hold for full jump
+        jumpAcceleration: 1100,           // Velocity added per second while holding
         canHoldJump: true,                // Hold for higher jump
         rotatesOnJump: true,
         rotationSpeed: 350,

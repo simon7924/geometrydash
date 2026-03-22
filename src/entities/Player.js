@@ -476,16 +476,19 @@ export class Player {
 
         if (this.isOnGround) {
             if (this.inputJustPressed || this.inputHeld) {
-                // Start jump
+                // Start jump with minimum velocity
                 this.jumpHoldTime = 0;
                 this.robotJumping = true;
-                // Apply full boost velocity immediately
-                this.sprite.setVelocityY(mode.maxJumpVelocity * this.gravityDirection);
+                this.sprite.setVelocityY(mode.minJumpVelocity * this.gravityDirection);
             }
         } else if (this.robotJumping && this.inputHeld && this.jumpHoldTime < mode.jumpHoldTime) {
-            // Still within hold window — keep overriding velocity with constant boost
+            // Gradually accelerate upward while held, capped at maxJumpVelocity
             this.jumpHoldTime += delta / 1000;
-            this.sprite.setVelocityY(mode.maxJumpVelocity * this.gravityDirection);
+            const currentVel = this.sprite.body.velocity.y;
+            const boost = mode.jumpAcceleration * (delta / 1000) * this.gravityDirection;
+            const newVel = currentVel - boost;
+            const cap = mode.maxJumpVelocity * this.gravityDirection;
+            this.sprite.setVelocityY(this.gravityDirection === 1 ? Math.max(newVel, cap) : Math.min(newVel, cap));
         } else if (!this.inputHeld || this.jumpHoldTime >= mode.jumpHoldTime) {
             // Released or hold expired — stop boosting, let gravity take over
             this.robotJumping = false;
