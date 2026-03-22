@@ -219,9 +219,6 @@ export class EndlessGenerator {
         // Pillar 3: gap center 340 → floor to 475, ceiling to 205
         this._shipCeilingPillar(obs, x + 880, 205);
         this._shipFloorPillar(obs, x + 880, 475);
-        // Floating platforms mid-section between pillars
-        this._shipFloatingPlatform(obs, x + 370, 310);
-        this._shipFloatingPlatform(obs, x + 700, 290);
         return { obstacles: obs, mode: 'SHIP', width: 1100 };
     }
 
@@ -240,13 +237,6 @@ export class EndlessGenerator {
             this._shipCeilingPillar(obs, cx, center - half - 50);
             this._shipFloorPillar(obs, cx, center + half + 50);
         });
-        // Small floating single-block hazards in the gaps
-        obs.push({ type: 'block', x: x + 300, y: 330 });
-        obs.push({ type: 'spike', x: x + 300, y: 280 });
-        obs.push({ type: 'spike', x: x + 300, y: 380, flipY: true });
-        obs.push({ type: 'block', x: x + 800, y: 310 });
-        obs.push({ type: 'spike', x: x + 800, y: 260 });
-        obs.push({ type: 'spike', x: x + 800, y: 360, flipY: true });
         return { obstacles: obs, mode: 'SHIP', width: 1100 };
     }
 
@@ -264,13 +254,6 @@ export class EndlessGenerator {
             this._shipCeilingPillar(obs, cx, center - half - 50);
             this._shipFloorPillar(obs, cx, center + half + 50);
         });
-        // Floating hazard blocks in the wide open areas to break them up
-        // Between pillar 1 (top gap) and pillar 2 (bottom gap): place obstacle mid-height
-        obs.push({ type: 'block', x: x + 300, y: 420 });
-        obs.push({ type: 'spike', x: x + 300, y: 370 });
-        // Between pillar 3 (top gap) and pillar 4 (bottom gap)
-        obs.push({ type: 'block', x: x + 800, y: 400 });
-        obs.push({ type: 'spike', x: x + 800, y: 350 });
         return { obstacles: obs, mode: 'SHIP', width: 1100 };
     }
 
@@ -322,25 +305,28 @@ export class EndlessGenerator {
 
     chunk_ufo_scattered(x) {
         const obs = [];
-        // Floor block wall with spike top, ceiling block wall with spike bottom — forces player off edges
-        // Floor ridge at left
-        for (let bx = x + 150; bx <= x + 250; bx += 50) {
-            obs.push({ type: 'block', x: bx, y: this.groundY - 25 });
-            obs.push({ type: 'spike', x: bx, y: this.groundY - 75 });
-        }
-        // Ceiling ridge at right
-        for (let bx = x + 1100; bx <= x + 1200; bx += 50) {
-            obs.push({ type: 'block', x: bx, y: this.ceilingY + 25 });
-            obs.push({ type: 'spike', x: bx, y: this.ceilingY + 75, flipY: true });
-        }
-        // Floating islands at varying heights — player must tap-boost between them
-        this._ufoIsland(obs, x + 380, 270, 2);   // high island
-        this._ufoIsland(obs, x + 620, 390, 2);   // low island
-        this._ufoIsland(obs, x + 860, 250, 2);   // high island
-        // Single spike hazards in open space between islands
-        obs.push({ type: 'spike', x: x + 500, y: 430 });
-        obs.push({ type: 'spike', x: x + 740, y: 290 });
-        obs.push({ type: 'spike', x: x + 980, y: 370 });
+        // 4 pillar columns, gap centers alternating high/low
+        const defs = [
+            { cx: x + 200, gapCenter: 300 },
+            { cx: x + 530, gapCenter: 420 },
+            { cx: x + 860, gapCenter: 280 },
+            { cx: x + 1190, gapCenter: 400 },
+        ];
+        const half = 105;
+        defs.forEach(({ cx, gapCenter }) => {
+            let lastTop = this.ceilingY + 25;
+            for (let y = this.ceilingY + 25; y <= gapCenter - half - 50; y += 50) {
+                obs.push({ type: 'block', x: cx, y });
+                lastTop = y;
+            }
+            obs.push({ type: 'spike', x: cx, y: lastTop + 50, flipY: true });
+            let lastBot = this.groundY - 25;
+            for (let y = this.groundY - 25; y >= gapCenter + half + 50; y -= 50) {
+                obs.push({ type: 'block', x: cx, y });
+                lastBot = y;
+            }
+            obs.push({ type: 'spike', x: cx, y: lastBot - 50 });
+        });
         return { obstacles: obs, mode: 'UFO', width: 1400 };
     }
 
@@ -371,11 +357,6 @@ export class EndlessGenerator {
             }
             obs.push({ type: 'spike', x: cx, y: lastBot - 50 });
         });
-        // Floating single block in each wide gap to add extra obstacle
-        obs.push({ type: 'block', x: x + 340, y: 355 });
-        obs.push({ type: 'spike', x: x + 340, y: 305 });
-        obs.push({ type: 'block', x: x + 640, y: 340 });
-        obs.push({ type: 'spike', x: x + 640, y: 290 });
         return { obstacles: obs, mode: 'UFO', width: 1400 };
     }
 
@@ -415,11 +396,6 @@ export class EndlessGenerator {
             { cx: x + 1030, center: 355 },
         ];
         pillars.forEach(({ cx, center }) => this._wavePillar(obs, cx, center, 220));
-        // Small floating block between pillars 2 and 3, above the wave path — visual interest
-        obs.push({ type: 'block', x: x + 480, y: 200 });
-        obs.push({ type: 'spike', x: x + 480, y: 250, flipY: true });
-        obs.push({ type: 'block', x: x + 700, y: 470 });
-        obs.push({ type: 'spike', x: x + 700, y: 420 });
         return { obstacles: obs, mode: 'WAVE', width: 1200 };
     }
 

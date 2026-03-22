@@ -243,18 +243,6 @@ export class LevelGenerator {
                 lastBotShip = y;
             }
             obstacles.push({ type: 'spike', x: cx, y: lastBotShip - 50 });
-
-            // Floating 2-block platform with spikes top+bottom between alternating pillars
-            if (i % 2 === 0 && i + 1 < numColumns) {
-                const midX = cx + colSpacing / 2;
-                const midY = (gapCenter + gapCenters[(i + 1) % gapCenters.length]) / 2;
-                obstacles.push({ type: 'block', x: midX,      y: midY });
-                obstacles.push({ type: 'block', x: midX + 50, y: midY });
-                obstacles.push({ type: 'spike', x: midX,      y: midY - 50 });
-                obstacles.push({ type: 'spike', x: midX + 50, y: midY - 50 });
-                obstacles.push({ type: 'spike', x: midX,      y: midY + 50, flipY: true });
-                obstacles.push({ type: 'spike', x: midX + 50, y: midY + 50, flipY: true });
-            }
         }
 
         return obstacles;
@@ -344,14 +332,6 @@ export class LevelGenerator {
                 lastBotUfo = y;
             }
             obstacles.push({ type: 'spike', x: cx, y: lastBotUfo - 50 });
-
-            // Floating single-block island with spike on top, positioned in the gap midpoint
-            if (i % 2 === 1) {
-                const islandY = gapCenter - 20;
-                obstacles.push({ type: 'block', x: cx - 25, y: islandY });
-                obstacles.push({ type: 'spike', x: cx - 25, y: islandY - 50 });
-                obstacles.push({ type: 'spike', x: cx - 25, y: islandY + 50, flipY: true });
-            }
         }
 
         return obstacles;
