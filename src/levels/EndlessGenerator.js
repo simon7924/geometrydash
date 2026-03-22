@@ -177,15 +177,15 @@ export class EndlessGenerator {
     // ==================== SHIP CHUNKS ====================
     // Helpers for building block pillars with spike tips
 
-    // Block column from ceiling down to 'endY', spike at bottom tip
+    // Block column from ceiling down to 'endY', spike tip points DOWN into gap
     _shipCeilingPillar(obs, cx, endY) {
         for (let y = this.ceilingY + 25; y <= endY; y += 50) {
             obs.push({ type: 'block', x: cx, y });
         }
-        obs.push({ type: 'spike', x: cx, y: endY + 50 });
+        obs.push({ type: 'spike', x: cx, y: endY + 50, flipY: true });
     }
 
-    // Block column from floor up to 'endY', spike at top tip (pointing up = default)
+    // Block column from floor up to 'endY', spike tip points UP into gap
     _shipFloorPillar(obs, cx, endY) {
         for (let y = this.groundY - 25; y >= endY; y -= 50) {
             obs.push({ type: 'block', x: cx, y });
@@ -356,7 +356,7 @@ export class EndlessGenerator {
             for (let y = this.ceilingY + 25; y <= gapCenter - half - 50; y += 50) {
                 obs.push({ type: 'block', x: cx, y });
             }
-            obs.push({ type: 'spike', x: cx, y: gapCenter - half });
+            obs.push({ type: 'spike', x: cx, y: gapCenter - half, flipY: true });
             // Floor column: blocks from floor up to gap bottom, spike pointing up at tip
             for (let y = this.groundY - 25; y >= gapCenter + half + 50; y -= 50) {
                 obs.push({ type: 'block', x: cx, y });
@@ -384,12 +384,12 @@ export class EndlessGenerator {
         for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
             obs.push({ type: 'block', x: cx, y });
         }
-        obs.push({ type: 'spike', x: cx, y: topEnd });          // spike tip pointing down into gap
+        obs.push({ type: 'spike', x: cx, y: topEnd, flipY: true }); // spike tip pointing down into gap
         // Floor blocks
         for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
             obs.push({ type: 'block', x: cx, y });
         }
-        obs.push({ type: 'spike', x: cx, y: botStart, flipY: true }); // spike tip pointing up into gap
+        obs.push({ type: 'spike', x: cx, y: botStart }); // spike tip pointing up into gap
     }
 
     chunk_wave_gentle(x) {

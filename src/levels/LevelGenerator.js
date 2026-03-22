@@ -228,17 +228,17 @@ export class LevelGenerator {
             const topEnd = gapCenter - gapSize / 2;
             const botStart = gapCenter + gapSize / 2;
 
-            // Ceiling block pillar — blocks from ceiling down, spike tip at gap edge
+            // Ceiling block pillar — blocks from ceiling down, spike tip points DOWN into gap
             for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
                 obstacles.push({ type: 'block', x: cx, y });
             }
-            obstacles.push({ type: 'spike', x: cx, y: topEnd });
+            obstacles.push({ type: 'spike', x: cx, y: topEnd, flipY: true });
 
-            // Floor block pillar — blocks from floor up, spike tip at gap edge
+            // Floor block pillar — blocks from floor up, spike tip points UP into gap
             for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
                 obstacles.push({ type: 'block', x: cx, y });
             }
-            obstacles.push({ type: 'spike', x: cx, y: botStart, flipY: true });
+            obstacles.push({ type: 'spike', x: cx, y: botStart });
 
             // Floating 2-block platform with spikes top+bottom between alternating pillars
             if (i % 2 === 0 && i + 1 < numColumns) {
@@ -325,17 +325,17 @@ export class LevelGenerator {
             const topEnd = gapCenter - gapSize / 2;
             const botStart = gapCenter + gapSize / 2;
 
-            // Ceiling block pillar with spike tip
+            // Ceiling block pillar — spike tip points DOWN into gap
             for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
                 obstacles.push({ type: 'block', x: cx, y });
             }
-            obstacles.push({ type: 'spike', x: cx, y: topEnd });
+            obstacles.push({ type: 'spike', x: cx, y: topEnd, flipY: true });
 
-            // Floor block pillar with spike tip
+            // Floor block pillar — spike tip points UP into gap
             for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
                 obstacles.push({ type: 'block', x: cx, y });
             }
-            obstacles.push({ type: 'spike', x: cx, y: botStart, flipY: true });
+            obstacles.push({ type: 'spike', x: cx, y: botStart });
 
             // Floating single-block island with spike on top, positioned in the gap midpoint
             if (i % 2 === 1) {
@@ -366,17 +366,17 @@ export class LevelGenerator {
             const topEnd = gapY - gapSize / 2;
             const botStart = gapY + gapSize / 2;
 
-            // Ceiling block pillar with spike tip pointing into gap
+            // Ceiling block pillar — spike tip points DOWN into gap
             for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
                 obstacles.push({ type: 'block', x: currentX, y });
             }
-            obstacles.push({ type: 'spike', x: currentX, y: topEnd });
+            obstacles.push({ type: 'spike', x: currentX, y: topEnd, flipY: true });
 
-            // Floor block pillar with spike tip pointing into gap
+            // Floor block pillar — spike tip points UP into gap
             for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
                 obstacles.push({ type: 'block', x: currentX, y });
             }
-            obstacles.push({ type: 'spike', x: currentX, y: botStart, flipY: true });
+            obstacles.push({ type: 'spike', x: currentX, y: botStart });
 
             currentX += baseSpacing + random() * 50;
         }
