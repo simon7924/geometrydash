@@ -267,7 +267,7 @@ export class Player {
         }
     }
 
-    updateCube(_delta) {
+    updateCube(delta) {
         const mode = GAME_MODES.CUBE;
 
         // Jump when on ground - supports both tap and hold
@@ -278,18 +278,15 @@ export class Player {
                 jumpVel *= MINI_MODIFIERS.jumpMultiplier;
             }
             this.sprite.setVelocityY(jumpVel);
-            this.targetRotation += 360 * this.gravityDirection;
         }
 
-        // Rotation while in air
+        // Rotation while in air — constant speed so full 360 is always visible
         if (!this.isOnGround && mode.rotatesOnJump) {
-            const rotDiff = this.targetRotation - this.currentRotation;
-            this.currentRotation += rotDiff * 0.15;
+            this.currentRotation += 600 * this.gravityDirection * (delta / 1000);
             this.sprite.setAngle(this.currentRotation);
         } else if (this.isOnGround && mode.groundRotation) {
             // Snap to nearest 90 degrees on ground
             this.currentRotation = Math.round(this.currentRotation / 90) * 90;
-            this.targetRotation = this.currentRotation;
             this.sprite.setAngle(this.currentRotation);
         }
     }
