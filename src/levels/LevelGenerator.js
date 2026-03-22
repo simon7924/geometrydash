@@ -10,6 +10,7 @@ export class LevelGenerator {
     generateLevel(difficulty, seed) {
         const random = this.seededRandom(seed);
         const config = this.getDifficultyConfig(difficulty);
+        config.difficulty = difficulty;
         const obstacles = [];
         const portals = [];
 
@@ -218,6 +219,14 @@ export class LevelGenerator {
         let currentX = section.startX;
         const spacing = 250 + random() * 80; // Distance between corridor walls
 
+        // For levels 4+, line floor and ceiling with spikes so player can't hug walls
+        if (config.difficulty >= 4) {
+            for (let x = section.startX + 150; x < section.endX - 100; x += 200) {
+                obstacles.push({ type: 'spike', x, y: this.groundY - 57 });
+                obstacles.push({ type: 'spike', x, y: this.ceilingY + 57, flipY: true });
+            }
+        }
+
         // The ship flies in the open space between ground (650) and ceiling (70)
         // Place spike columns from top and bottom with a gap for the ship to fly through
         while (currentX < section.endX) {
@@ -318,6 +327,14 @@ export class LevelGenerator {
         let currentX = section.startX;
         const spacing = 220 + random() * 60;
 
+        // For levels 4+, line floor and ceiling with spikes
+        if (config.difficulty >= 4) {
+            for (let x = section.startX + 150; x < section.endX - 100; x += 200) {
+                obstacles.push({ type: 'spike', x, y: this.groundY - 57 });
+                obstacles.push({ type: 'spike', x, y: this.ceilingY + 57, flipY: true });
+            }
+        }
+
         while (currentX < section.endX) {
             const patternRoll = random();
 
@@ -388,6 +405,14 @@ export class LevelGenerator {
         let currentX = section.startX;
         const spacing = 200 + random() * 40;
         let gapY = 350; // Start in middle
+
+        // For levels 4+, line floor and ceiling with spikes
+        if (config.difficulty >= 4) {
+            for (let x = section.startX + 150; x < section.endX - 100; x += 200) {
+                obstacles.push({ type: 'spike', x, y: this.groundY - 57 });
+                obstacles.push({ type: 'spike', x, y: this.ceilingY + 57, flipY: true });
+            }
+        }
 
         while (currentX < section.endX) {
             // Move the gap up or down to create a weaving path
