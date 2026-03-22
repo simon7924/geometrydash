@@ -9,7 +9,6 @@ const CAM_SPEED = 400; // px/s when scrolling
 
 // Obstacle palette entries
 const TOOLS = [
-    { id: 'select',       label: '🖱 Select',        color: 0x888888 },
     { id: 'spike',        label: '▲ Spike',          color: 0xff4444 },
     { id: 'spike_ceil',   label: '▼ Ceil Spike',     color: 0xff8844 },
     { id: 'block',        label: '■ Block',           color: 0x4488ff },
@@ -113,38 +112,41 @@ export class LevelEditorScene extends Phaser.Scene {
         this._uiObjects.push(this._scrollbarBg, this._scrollbarThumb);
 
         // ── Input ──────────────────────────────────────────────────────────
-        this.input.on('pointermove', (p) => this._onMove(p, TOOLBAR_W));
-        this.input.on('pointerdown', (p) => this._onDown(p, TOOLBAR_W));
-        this.input.on('pointerup', () => { this._middleDragging = false; });
-
-        // Mouse wheel scroll
-        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
-            const maxScroll = this._levelLength;
-            this.worldCam.scrollX = Phaser.Math.Clamp(
-                this.worldCam.scrollX + deltaY * 1.2, 0, maxScroll
-            );
-        });
-
-        // Middle-mouse drag to pan
         this._middleDragging = false;
         this._middleDragStartX = 0;
         this._middleDragCamX = 0;
+
+        this.input.on('pointermove', (p) => {
+            // Middle-mouse pan
+            if (this._middleDragging) {
+                const dx = p.x - this._middleDragStartX;
+                this.worldCam.scrollX = Phaser.Math.Clamp(
+                    this._middleDragCamX - dx, 0, this._levelLength
+                );
+            }
+            this._onMove(p, TOOLBAR_W);
+        });
+
         this.input.on('pointerdown', (p) => {
             if (p.middleButtonDown()) {
                 this._middleDragging = true;
                 this._middleDragStartX = p.x;
                 this._middleDragCamX = this.worldCam.scrollX;
+                return;
             }
+            this._onDown(p, TOOLBAR_W);
         });
-        this.input.on('pointermove', (p) => {
-            if (this._middleDragging) {
-                const dx = p.x - this._middleDragStartX;
-                const maxScroll = this._levelLength;
-                this.worldCam.scrollX = Phaser.Math.Clamp(
-                    this._middleDragCamX - dx, 0, maxScroll
-                );
-            }
-        });
+
+        this.input.on('pointerup', () => { this._middleDragging = false; });
+
+        // Native wheel event — most reliable cross-browser scroll
+        this._wheelHandler = (e) => {
+            e.preventDefault();
+            this.worldCam.scrollX = Phaser.Math.Clamp(
+                this.worldCam.scrollX + e.deltaY * 1.5, 0, this._levelLength
+            );
+        };
+        this.game.canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
 
         // Keyboard scroll
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -156,18 +158,13 @@ export class LevelEditorScene extends Phaser.Scene {
             if (e.ctrlKey || e.metaKey) { e.preventDefault(); this._save(); }
         });
 
-        // Exclude toolbar from world cam
+        // Exclude toolbar+scrollbar from world cam
         this.worldCam.ignore(this._uiObjects || []);
 
         // Restore saved state from test play
         if (this._savedObjects) {
             this._savedObjects.forEach(o => this._place(o.gx, o.gy, 0, 0, o.type));
         }
-
-        // Start text
-        this.add.text(TOOLBAR_W + 20, 100,
-            'Click to place obstacles. Scroll to navigate. Ctrl+S to save.',
-            { font: '14px Arial', fill: '#666688' }).setScrollFactor(0).setDepth(5);
     }
 
     _buildToolbar(toolbarW, H) {
@@ -406,7 +403,6 @@ export class LevelEditorScene extends Phaser.Scene {
         const tool = forceTool || this.activeTool;
 
         if (tool === 'erase') { this._erase(gx, gy); return; }
-        if (tool === 'select') return;
 
         // Temporarily override activeTool for placement logic
         const prevTool = this.activeTool;
@@ -658,6 +654,10 @@ export class LevelEditorScene extends Phaser.Scene {
         [this._inputEl, this._lenEl, this._lenLabelEl].forEach(el => {
             if (el && el.parentNode) el.parentNode.removeChild(el);
         });
+        if (this._wheelHandler) {
+            this.game.canvas.removeEventListener('wheel', this._wheelHandler);
+            this._wheelHandler = null;
+        }
     }
 
     _setStatus(msg) {
