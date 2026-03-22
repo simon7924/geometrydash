@@ -132,18 +132,6 @@ export class Player {
             this.destroyWaveEmitter();
         }
 
-        // Manage spider teleport trail
-        if (modeName === 'SPIDER') {
-            if (!this.spiderTrail) {
-                this.spiderTrail = this.scene.add.graphics();
-                this.spiderTrail.setDepth(-1);
-            }
-        } else {
-            if (this.spiderTrail) {
-                this.spiderTrail.destroy();
-                this.spiderTrail = null;
-            }
-        }
 
         this.applyGameMode();
     }
@@ -290,7 +278,7 @@ export class Player {
                 jumpVel *= MINI_MODIFIERS.jumpMultiplier;
             }
             this.sprite.setVelocityY(jumpVel);
-            this.targetRotation += 90 * this.gravityDirection;
+            this.targetRotation += 360 * this.gravityDirection;
         }
 
         // Rotation while in air
@@ -431,12 +419,49 @@ export class Player {
             // Then flip gravity
             this.flipGravity();
 
-            // Draw white teleport line trail from old position to new position
-            if (this.spiderTrail) {
-                this.spiderTrail.lineStyle(2, 0xffffff, 0.85);
-                this.spiderTrail.lineBetween(fromX, fromY, fromX, destY);
-            }
+            // Draw zap flash from old position to new position
+            this._drawZapFlash(fromX, fromY, fromX, destY);
         }
+    }
+
+    _drawZapFlash(x1, y1, x2, y2) {
+        const g = this.scene.add.graphics();
+        g.setDepth(10);
+
+        // Build a jagged zap path between (x1,y1) and (x2,y2)
+        const dy = y2 - y1;
+        const steps = 8;
+        const jitter = 10; // max horizontal wobble
+        const points = [{ x: x1, y: y1 }];
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            const offset = (Math.random() - 0.5) * 2 * jitter;
+            points.push({ x: x1 + offset, y: y1 + dy * t });
+        }
+        points.push({ x: x2, y: y2 });
+
+        // Outer glow — thick, semi-transparent cyan
+        g.lineStyle(8, 0x00ffff, 0.35);
+        g.beginPath();
+        g.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y);
+        g.strokePath();
+
+        // Inner core — thinner, bright white
+        g.lineStyle(3, 0xffffff, 1.0);
+        g.beginPath();
+        g.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) g.lineTo(points[i].x, points[i].y);
+        g.strokePath();
+
+        // Fade out quickly
+        this.scene.tweens.add({
+            targets: g,
+            alpha: 0,
+            duration: 180,
+            ease: 'Power2',
+            onComplete: () => g.destroy()
+        });
     }
 
     updateRobot(delta) {
