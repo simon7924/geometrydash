@@ -216,52 +216,34 @@ export class LevelGenerator {
     // Ship holds to rise, releases to fall. Create passages at varying heights.
     generateShipSection(section, config, random) {
         const obstacles = [];
-        let currentX = section.startX;
-        const spacing = 250 + random() * 80; // Distance between corridor walls
+        const wallSpikes = config.difficulty >= 4;
+        const sectionLen = section.endX - section.startX;
+        const numColumns = Math.max(3, Math.floor(sectionLen / 300));
+        const colSpacing = sectionLen / (numColumns + 1);
 
-        // For levels 4+, line floor and ceiling with spikes so player can't hug walls
-        if (config.difficulty >= 4) {
-            for (let x = section.startX + 150; x < section.endX - 100; x += 200) {
-                obstacles.push({ type: 'spike', x, y: this.groundY - 57 });
-                obstacles.push({ type: 'spike', x, y: this.ceilingY + 57, flipY: true });
+        // Alternate gap center high/low for a weaving path
+        const gapCenters = [280, 400, 260, 420, 300, 380];
+        const gapSize = 220;
+
+        for (let i = 0; i < numColumns; i++) {
+            const cx = section.startX + colSpacing * (i + 1);
+            const gapCenter = gapCenters[i % gapCenters.length];
+            const top = gapCenter - gapSize / 2;
+            const bot = gapCenter + gapSize / 2;
+
+            // Spike pillar above gap
+            for (let y = this.playableTop; y < top; y += 50) {
+                obstacles.push({ type: 'spike', x: cx, y, flipY: true });
             }
-        }
-
-        // The ship flies in the open space between ground (650) and ceiling (70)
-        // Place spike columns from top and bottom with a gap for the ship to fly through
-        while (currentX < section.endX) {
-            const gapSize = 180 + random() * 60; // Gap the ship flies through
-            const gapCenter = 250 + random() * 250; // Y center of the gap (between 250 and 500)
-            const gapTop = gapCenter - gapSize / 2;
-            const gapBottom = gapCenter + gapSize / 2;
-
-            // Spikes coming down from ceiling area
-            if (gapTop > this.playableTop + 50) {
-                // Place 1-2 spikes pointing down from above the gap
-                const numTopSpikes = Math.floor((gapTop - this.playableTop) / 60);
-                for (let i = 0; i < Math.min(numTopSpikes, 3); i++) {
-                    obstacles.push({
-                        type: 'spike',
-                        x: currentX,
-                        y: this.playableTop + i * 55,
-                        flipY: true
-                    });
-                }
+            // Spike pillar below gap
+            for (let y = bot; y < this.playableBottom; y += 50) {
+                obstacles.push({ type: 'spike', x: cx, y });
             }
-
-            // Spikes coming up from ground area
-            if (gapBottom < this.playableBottom - 50) {
-                const numBottomSpikes = Math.floor((this.playableBottom - gapBottom) / 60);
-                for (let i = 0; i < Math.min(numBottomSpikes, 3); i++) {
-                    obstacles.push({
-                        type: 'spike',
-                        x: currentX,
-                        y: this.playableBottom - i * 55
-                    });
-                }
+            // Floor/ceiling spikes at same column x
+            if (wallSpikes) {
+                obstacles.push({ type: 'spike', x: cx, y: this.groundY - 57 });
+                obstacles.push({ type: 'spike', x: cx, y: this.ceilingY + 57, flipY: true });
             }
-
-            currentX += spacing + random() * 100;
         }
 
         return obstacles;
@@ -324,74 +306,34 @@ export class LevelGenerator {
     // UFO falls with gravity, each tap gives a small upward boost (multi-jump)
     generateUFOSection(section, config, random) {
         const obstacles = [];
-        let currentX = section.startX;
-        const spacing = 220 + random() * 60;
+        const wallSpikes = config.difficulty >= 4;
+        const sectionLen = section.endX - section.startX;
+        const numColumns = Math.max(3, Math.floor(sectionLen / 280));
+        const colSpacing = sectionLen / (numColumns + 1);
 
-        // For levels 4+, line floor and ceiling with spikes
-        if (config.difficulty >= 4) {
-            for (let x = section.startX + 150; x < section.endX - 100; x += 200) {
-                obstacles.push({ type: 'spike', x, y: this.groundY - 57 });
-                obstacles.push({ type: 'spike', x, y: this.ceilingY + 57, flipY: true });
+        // Alternate gap center high/low
+        const gapCenters = [300, 420, 260, 400, 280, 380];
+        const gapSize = 200;
+
+        for (let i = 0; i < numColumns; i++) {
+            const cx = section.startX + colSpacing * (i + 1);
+            const gapCenter = gapCenters[i % gapCenters.length];
+            const top = gapCenter - gapSize / 2;
+            const bot = gapCenter + gapSize / 2;
+
+            // Spike pillar above gap
+            for (let y = this.playableTop; y < top; y += 50) {
+                obstacles.push({ type: 'spike', x: cx, y, flipY: true });
             }
-        }
-
-        while (currentX < section.endX) {
-            const patternRoll = random();
-
-            if (patternRoll < 0.35) {
-                // Single floating spike at random height
-                const spikeY = 200 + random() * 350;
-                obstacles.push({ type: 'spike', x: currentX, y: spikeY });
-            } else if (patternRoll < 0.65) {
-                // Column of spikes with a gap to fly through
-                const gapCenter = 250 + random() * 200;
-                const gapSize = 160 + random() * 40;
-
-                // Bottom spike(s)
-                obstacles.push({
-                    type: 'spike',
-                    x: currentX,
-                    y: gapCenter + gapSize / 2 + 30
-                });
-                if (gapCenter + gapSize / 2 + 90 < this.playableBottom) {
-                    obstacles.push({
-                        type: 'spike',
-                        x: currentX,
-                        y: gapCenter + gapSize / 2 + 85
-                    });
-                }
-
-                // Top spike(s)
-                obstacles.push({
-                    type: 'spike',
-                    x: currentX,
-                    y: gapCenter - gapSize / 2 - 30,
-                    flipY: true
-                });
-                if (gapCenter - gapSize / 2 - 90 > this.playableTop) {
-                    obstacles.push({
-                        type: 'spike',
-                        x: currentX,
-                        y: gapCenter - gapSize / 2 - 85,
-                        flipY: true
-                    });
-                }
-            } else {
-                // Ground spike + ceiling spike offset — fly between them
-                obstacles.push({
-                    type: 'spike',
-                    x: currentX,
-                    y: this.groundY - 57
-                });
-                obstacles.push({
-                    type: 'spike',
-                    x: currentX + 120,
-                    y: this.playableTop + 20,
-                    flipY: true
-                });
+            // Spike pillar below gap
+            for (let y = bot; y < this.playableBottom; y += 50) {
+                obstacles.push({ type: 'spike', x: cx, y });
             }
-
-            currentX += spacing + random() * 80;
+            // Floor/ceiling spikes at same column x
+            if (wallSpikes) {
+                obstacles.push({ type: 'spike', x: cx, y: this.groundY - 57 });
+                obstacles.push({ type: 'spike', x: cx, y: this.ceilingY + 57, flipY: true });
+            }
         }
 
         return obstacles;
@@ -402,42 +344,29 @@ export class LevelGenerator {
     // Create block walls with gaps at different heights to weave through
     generateWaveSection(section, config, random) {
         const obstacles = [];
+        const wallSpikes = config.difficulty >= 4;
         let currentX = section.startX;
         const spacing = 200 + random() * 40;
         let gapY = 350; // Start in middle
-
-        // For levels 4+, line floor and ceiling with spikes
-        if (config.difficulty >= 4) {
-            for (let x = section.startX + 150; x < section.endX - 100; x += 200) {
-                obstacles.push({ type: 'spike', x, y: this.groundY - 57 });
-                obstacles.push({ type: 'spike', x, y: this.ceilingY + 57, flipY: true });
-            }
-        }
 
         while (currentX < section.endX) {
             // Move the gap up or down to create a weaving path
             const gapShift = (random() - 0.5) * 200;
             gapY = Math.max(this.playableTop + 100, Math.min(this.playableBottom - 100, gapY + gapShift));
-            const gapSize = 150 + random() * 40; // Wave has small hitbox so gap can be tighter
+            const gapSize = 150 + random() * 40;
 
-            // Build a column of blocks with a gap
-            // Top blocks
+            // Top spike pillar
             for (let y = this.playableTop; y < gapY - gapSize / 2; y += 55) {
-                obstacles.push({
-                    type: 'spike',
-                    x: currentX,
-                    y: y,
-                    flipY: true
-                });
+                obstacles.push({ type: 'spike', x: currentX, y, flipY: true });
             }
-
-            // Bottom blocks
+            // Bottom spike pillar
             for (let y = gapY + gapSize / 2; y < this.playableBottom; y += 55) {
-                obstacles.push({
-                    type: 'spike',
-                    x: currentX,
-                    y: y
-                });
+                obstacles.push({ type: 'spike', x: currentX, y });
+            }
+            // Floor/ceiling spikes at same column x
+            if (wallSpikes) {
+                obstacles.push({ type: 'spike', x: currentX, y: this.groundY - 57 });
+                obstacles.push({ type: 'spike', x: currentX, y: this.ceilingY + 57, flipY: true });
             }
 
             currentX += spacing + random() * 60;
