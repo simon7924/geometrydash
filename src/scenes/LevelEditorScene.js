@@ -102,9 +102,49 @@ export class LevelEditorScene extends Phaser.Scene {
         this._buildNameInput(W, TOOLBAR_W);
         this._updateLevelBoundLine(); // apply restored/default length
 
+        // ── Scrollbar ──────────────────────────────────────────────────────
+        this._scrollbarBg = this.add.rectangle(
+            TOOLBAR_W + PLAY_AREA_W / 2, H - 8, PLAY_AREA_W, 12, 0x1a1a3e
+        ).setScrollFactor(0).setDepth(25);
+        this._scrollbarThumb = this.add.rectangle(
+            TOOLBAR_W + 20, H - 8, 40, 8, 0x4a4a8e
+        ).setScrollFactor(0).setDepth(26);
+        this._uiObjects = this._uiObjects || [];
+        this._uiObjects.push(this._scrollbarBg, this._scrollbarThumb);
+
         // ── Input ──────────────────────────────────────────────────────────
         this.input.on('pointermove', (p) => this._onMove(p, TOOLBAR_W));
         this.input.on('pointerdown', (p) => this._onDown(p, TOOLBAR_W));
+        this.input.on('pointerup', () => { this._middleDragging = false; });
+
+        // Mouse wheel scroll
+        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
+            const maxScroll = this._levelLength;
+            this.worldCam.scrollX = Phaser.Math.Clamp(
+                this.worldCam.scrollX + deltaY * 1.2, 0, maxScroll
+            );
+        });
+
+        // Middle-mouse drag to pan
+        this._middleDragging = false;
+        this._middleDragStartX = 0;
+        this._middleDragCamX = 0;
+        this.input.on('pointerdown', (p) => {
+            if (p.middleButtonDown()) {
+                this._middleDragging = true;
+                this._middleDragStartX = p.x;
+                this._middleDragCamX = this.worldCam.scrollX;
+            }
+        });
+        this.input.on('pointermove', (p) => {
+            if (this._middleDragging) {
+                const dx = p.x - this._middleDragStartX;
+                const maxScroll = this._levelLength;
+                this.worldCam.scrollX = Phaser.Math.Clamp(
+                    this._middleDragCamX - dx, 0, maxScroll
+                );
+            }
+        });
 
         // Keyboard scroll
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -627,12 +667,25 @@ export class LevelEditorScene extends Phaser.Scene {
     update(time, delta) {
         const dt = delta / 1000;
         const TOOLBAR_W = 160;
+        const W = this.cameras.main.width;
+        const H = this.cameras.main.height;
+        const PLAY_AREA_W = W - TOOLBAR_W;
 
-        // Scroll world cam
+        // Keyboard scroll
         const left = this.cursors.left.isDown || this.wasd.left.isDown;
         const right = this.cursors.right.isDown || this.wasd.right.isDown;
-        if (left) this.worldCam.scrollX = Math.max(0, this.worldCam.scrollX - CAM_SPEED * dt);
-        if (right) this.worldCam.scrollX = Math.min(this._levelLength, this.worldCam.scrollX + CAM_SPEED * dt);
+        const maxScroll = this._levelLength;
+        if (left)  this.worldCam.scrollX = Math.max(0, this.worldCam.scrollX - CAM_SPEED * dt);
+        if (right) this.worldCam.scrollX = Math.min(maxScroll, this.worldCam.scrollX + CAM_SPEED * dt);
+
+        // Update scrollbar thumb
+        if (this._scrollbarThumb && this._scrollbarThumb.active) {
+            const totalWorld = this._levelLength + PLAY_AREA_W;
+            const thumbW = Math.max(30, (PLAY_AREA_W / totalWorld) * PLAY_AREA_W);
+            const scrollRatio = this.worldCam.scrollX / maxScroll;
+            const thumbX = TOOLBAR_W + (scrollRatio * (PLAY_AREA_W - thumbW)) + thumbW / 2;
+            this._scrollbarThumb.setSize(thumbW, 8).setPosition(thumbX, H - 8);
+        }
     }
 
     shutdown() {
