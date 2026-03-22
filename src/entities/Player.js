@@ -271,22 +271,29 @@ export class Player {
         const mode = GAME_MODES.CUBE;
 
         // Jump when on ground - supports both tap and hold
-        // If held, auto-jumps as soon as landing (like real Geometry Dash)
         if ((this.inputJustPressed || this.inputHeld) && this.isOnGround) {
             let jumpVel = mode.jumpVelocity * this.gravityDirection;
             if (this.isMini) {
                 jumpVel *= MINI_MODIFIERS.jumpMultiplier;
             }
             this.sprite.setVelocityY(jumpVel);
+            this.targetRotation += 180 * this.gravityDirection;
         }
 
-        // Rotation while in air — constant speed so full 360 is always visible
+        // Rotation while in air — constant speed, always rotates toward target
         if (!this.isOnGround && mode.rotatesOnJump) {
-            this.currentRotation += 600 * this.gravityDirection * (delta / 1000);
+            const rotSpeed = 360 * (delta / 1000);
+            const diff = this.targetRotation - this.currentRotation;
+            if (Math.abs(diff) <= rotSpeed) {
+                this.currentRotation = this.targetRotation;
+            } else {
+                this.currentRotation += Math.sign(diff) * rotSpeed;
+            }
             this.sprite.setAngle(this.currentRotation);
         } else if (this.isOnGround && mode.groundRotation) {
             // Snap to nearest 90 degrees on ground
             this.currentRotation = Math.round(this.currentRotation / 90) * 90;
+            this.targetRotation = this.currentRotation;
             this.sprite.setAngle(this.currentRotation);
         }
     }
