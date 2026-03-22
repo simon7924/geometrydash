@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth Testing - Pulse Dash</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .section {
+      background: #2a2a2a;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+    input, button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #333;
+      color: #fff;
+      font-size: 14px;
+    }
+    button {
+      background: #0066cc;
+      cursor: pointer;
+      border: none;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    #status {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 10px;
+      min-height: 50px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .success { color: #4CAF50; }
+    .error { color: #f44336; }
+    .info { color: #2196F3; }
+    h2 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <h1>🎮 Pulse Dash - Auth Testing</h1>
+
+  <div class="section">
+    <h2>1. Sign Up</h2>
+    <input type="email" id="signupEmail" placeholder="Email">
+    <input type="password" id="signupPassword" placeholder="Password">
+    <input type="text" id="signupUsername" placeholder="Username">
+    <button onclick="testSignUp()">Sign Up</button>
+  </div>
+
+  <div class="section">
+    <h2>2. Log In</h2>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button onclick="testLogIn()">Log In</button>
+  </div>
+
+  <div class="section">
+    <h2>3. Get Current User</h2>
+    <button onclick="testGetCurrentUser()">Get Current User</button>
+  </div>
+
+  <div class="section">
+    <h2>4. Get Session</h2>
+    <button onclick="testGetSession()">Get Session</button>
+  </div>
+
+  <div class="section">
+    <h2>5. Log Out</h2>
+    <button onclick="testLogOut()">Log Out</button>
+  </div>
+
+  <div class="section">
+    <h2>Status</h2>
+    <div id="status">Ready to test...</div>
+  </div>
+
+  <script type="module">
+    import { signUp, logIn, logOut, getCurrentUser, getSession, onAuthStateChange } from './supabase-browser.js'
+
+    // Listen for auth changes
+    onAuthStateChange((event, session) => {
+      const status = document.getElementById('status')
+      status.innerHTML += `\n<span class="info">🔔 Auth Event: ${event}</span>`
+      if (session) {
+        status.innerHTML += `\n<span class="info">   User: ${session.user.email}</span>`
+      }
+    })
+
+    // Test functions - Make them globally available
+    window.testSignUp = async () => {
+      try {
+        const email = document.getElementById('signupEmail').value
+        const password = document.getElementById('signupPassword').value
+        const username = document.getElementById('signupUsername').value
+
+        if (!email || !password || !username) {
+          document.getElementById('status').innerHTML = '<span class="error">❌ Please fill in all fields</span>'
+          return
+        }
+
+        const status = document.getElementById('status')
+        status.innerHTML = 'Signing up...'
+
+        const result = await signUp(email, password, username)
+
+        if (result.success) {
+          status.innerHTML = `<span class="success">✅ Sign up successful!</span>\n<pre>${JSON.stringify(result.user, null, 2)}</pre>`
+        } else {
+          status.innerHTML = `<span class="error">❌ Sign up failed: ${result.error}</span>`
+        }
+      } catch (error) {
+        document.getElementById('status').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`
+        console.error('Sign up error:', error)
+      }
+    }
+
+    window.testLogIn = async () => {
+      try {
+        const email = document.getElementById('loginEmail').value
+        const password = document.getElementById('loginPassword').value
+
+        if (!email || !password) {
+          document.getElementById('status').innerHTML = '<span class="error">❌ Please fill in email and password</span>'
+          return
+        }
+
+        const status = document.getElementById('status')
+        status.innerHTML = 'Logging in...'
+
+        const result = await logIn(email, password)
+
+        if (result.success) {
+          status.innerHTML = `<span class="success">✅ Login successful!</span>\n<pre>${JSON.stringify(result.user, null, 2)}</pre>`
+        } else {
+          status.innerHTML = `<span class="error">❌ Login failed: ${result.error}</span>`
+        }
+      } catch (error) {
+        document.getElementById('status').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`
+        console.error('Login error:', error)
+      }
+    }
+
+    window.testLogOut = async () => {
+      try {
+        const status = document.getElementById('status')
+        status.innerHTML = 'Logging out...'
+
+        const result = await logOut()
+
+        if (result.success) {
+          status.innerHTML = `<span class="success">✅ Logged out successfully!</span>`
+        } else {
+          status.innerHTML = `<span class="error">❌ Logout failed: ${result.error}</span>`
+        }
+      } catch (error) {
+        document.getElementById('status').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`
+        console.error('Logout error:', error)
+      }
+    }
+
+    window.testGetCurrentUser = async () => {
+      try {
+        const status = document.getElementById('status')
+        status.innerHTML = 'Getting current user...'
+
+        const user = await getCurrentUser()
+
+        if (user) {
+          status.innerHTML = `<span class="success">✅ Current User:</span>\n<pre>${JSON.stringify(user, null, 2)}</pre>`
+        } else {
+          status.innerHTML = `<span class="info">ℹ️ No user logged in</span>`
+        }
+      } catch (error) {
+        document.getElementById('status').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`
+        console.error('Get user error:', error)
+      }
+    }
+
+    window.testGetSession = async () => {
+      try {
+        const status = document.getElementById('status')
+        status.innerHTML = 'Getting session...'
+
+        const session = await getSession()
+
+        if (session) {
+          status.innerHTML = `<span class="success">✅ Session Active:</span>\n<pre>${JSON.stringify(session, null, 2)}</pre>`
+        } else {
+          status.innerHTML = `<span class="info">ℹ️ No active session</span>`
+        }
+      } catch (error) {
+        document.getElementById('status').innerHTML = `<span class="error">❌ Error: ${error.message}</span>`
+        console.error('Get session error:', error)
+      }
+    }
+
+    // Log that the script is loaded
+    console.log('Auth test page loaded successfully')
+    document.getElementById('status').innerHTML = 'Ready to test... (Script loaded ✓)'
+  </script>
+</body>
+</html>
