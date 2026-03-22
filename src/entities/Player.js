@@ -270,18 +270,19 @@ export class Player {
     updateCube(delta) {
         const mode = GAME_MODES.CUBE;
 
-        // Jump when on ground - supports both tap and hold
+        const wasInAir = this._cubeWasInAir || false;
+        this._cubeWasInAir = !this.isOnGround;
+
+        // Jump when on ground
         if ((this.inputJustPressed || this.inputHeld) && this.isOnGround) {
             let jumpVel = mode.jumpVelocity * this.gravityDirection;
-            if (this.isMini) {
-                jumpVel *= MINI_MODIFIERS.jumpMultiplier;
-            }
+            if (this.isMini) jumpVel *= MINI_MODIFIERS.jumpMultiplier;
             this.sprite.setVelocityY(jumpVel);
             this.targetRotation += 180 * this.gravityDirection;
         }
 
-        // Rotation while in air — constant speed, always rotates toward target
         if (!this.isOnGround && mode.rotatesOnJump) {
+            // Rotate at constant speed toward target
             const rotSpeed = 360 * (delta / 1000);
             const diff = this.targetRotation - this.currentRotation;
             if (Math.abs(diff) <= rotSpeed) {
@@ -290,8 +291,8 @@ export class Player {
                 this.currentRotation += Math.sign(diff) * rotSpeed;
             }
             this.sprite.setAngle(this.currentRotation);
-        } else if (this.isOnGround && mode.groundRotation) {
-            // Snap to nearest 90 degrees on ground
+        } else if (this.isOnGround && wasInAir) {
+            // Just landed — snap to nearest 90
             this.currentRotation = Math.round(this.currentRotation / 90) * 90;
             this.targetRotation = this.currentRotation;
             this.sprite.setAngle(this.currentRotation);
