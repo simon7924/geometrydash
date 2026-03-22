@@ -177,20 +177,24 @@ export class EndlessGenerator {
     // ==================== SHIP CHUNKS ====================
     // Helpers for building block pillars with spike tips
 
-    // Block column from ceiling down to 'endY', spike tip points DOWN into gap
+    // Block column from ceiling down, spike tip points DOWN touching last block
     _shipCeilingPillar(obs, cx, endY) {
+        let lastY = this.ceilingY + 25;
         for (let y = this.ceilingY + 25; y <= endY; y += 50) {
             obs.push({ type: 'block', x: cx, y });
+            lastY = y;
         }
-        obs.push({ type: 'spike', x: cx, y: endY + 50, flipY: true });
+        obs.push({ type: 'spike', x: cx, y: lastY + 50, flipY: true });
     }
 
-    // Block column from floor up to 'endY', spike tip points UP into gap
+    // Block column from floor up, spike tip points UP touching last block
     _shipFloorPillar(obs, cx, endY) {
+        let lastY = this.groundY - 25;
         for (let y = this.groundY - 25; y >= endY; y -= 50) {
             obs.push({ type: 'block', x: cx, y });
+            lastY = y;
         }
-        obs.push({ type: 'spike', x: cx, y: endY - 50 });
+        obs.push({ type: 'spike', x: cx, y: lastY - 50 });
     }
 
     // Floating block platform: 2-wide block with spikes on top and bottom
@@ -352,16 +356,20 @@ export class EndlessGenerator {
         ];
         const half = 110; // half gap = 220 total
         defs.forEach(({ cx, gapCenter }) => {
-            // Ceiling column: blocks from ceiling down to gap top, spike pointing down at tip
+            // Ceiling column: blocks from ceiling down, spike touching last block
+            let lastTop = this.ceilingY + 25;
             for (let y = this.ceilingY + 25; y <= gapCenter - half - 50; y += 50) {
                 obs.push({ type: 'block', x: cx, y });
+                lastTop = y;
             }
-            obs.push({ type: 'spike', x: cx, y: gapCenter - half, flipY: true });
-            // Floor column: blocks from floor up to gap bottom, spike pointing up at tip
+            obs.push({ type: 'spike', x: cx, y: lastTop + 50, flipY: true });
+            // Floor column: blocks from floor up, spike touching last block
+            let lastBot = this.groundY - 25;
             for (let y = this.groundY - 25; y >= gapCenter + half + 50; y -= 50) {
                 obs.push({ type: 'block', x: cx, y });
+                lastBot = y;
             }
-            obs.push({ type: 'spike', x: cx, y: gapCenter + half });
+            obs.push({ type: 'spike', x: cx, y: lastBot - 50 });
         });
         // Floating single block in each wide gap to add extra obstacle
         obs.push({ type: 'block', x: x + 340, y: 355 });
@@ -380,16 +388,20 @@ export class EndlessGenerator {
         const half = gapSize / 2;
         const topEnd = gapCenter - half;
         const botStart = gapCenter + half;
-        // Ceiling blocks
+        // Ceiling blocks — stop before the gap, track last block
+        let lastTop = this.ceilingY + 25;
         for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
             obs.push({ type: 'block', x: cx, y });
+            lastTop = y;
         }
-        obs.push({ type: 'spike', x: cx, y: topEnd, flipY: true }); // spike tip pointing down into gap
-        // Floor blocks
+        obs.push({ type: 'spike', x: cx, y: lastTop + 50, flipY: true });
+        // Floor blocks — stop before the gap, track last block
+        let lastBot = this.groundY - 25;
         for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
             obs.push({ type: 'block', x: cx, y });
+            lastBot = y;
         }
-        obs.push({ type: 'spike', x: cx, y: botStart }); // spike tip pointing up into gap
+        obs.push({ type: 'spike', x: cx, y: lastBot - 50 });
     }
 
     chunk_wave_gentle(x) {

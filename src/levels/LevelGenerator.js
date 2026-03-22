@@ -228,17 +228,21 @@ export class LevelGenerator {
             const topEnd = gapCenter - gapSize / 2;
             const botStart = gapCenter + gapSize / 2;
 
-            // Ceiling block pillar — blocks from ceiling down, spike tip points DOWN into gap
+            // Ceiling block pillar — spike touches last block, points DOWN
+            let lastTopShip = this.ceilingY + 25;
             for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
                 obstacles.push({ type: 'block', x: cx, y });
+                lastTopShip = y;
             }
-            obstacles.push({ type: 'spike', x: cx, y: topEnd, flipY: true });
+            obstacles.push({ type: 'spike', x: cx, y: lastTopShip + 50, flipY: true });
 
-            // Floor block pillar — blocks from floor up, spike tip points UP into gap
+            // Floor block pillar — spike touches last block, points UP
+            let lastBotShip = this.groundY - 25;
             for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
                 obstacles.push({ type: 'block', x: cx, y });
+                lastBotShip = y;
             }
-            obstacles.push({ type: 'spike', x: cx, y: botStart });
+            obstacles.push({ type: 'spike', x: cx, y: lastBotShip - 50 });
 
             // Floating 2-block platform with spikes top+bottom between alternating pillars
             if (i % 2 === 0 && i + 1 < numColumns) {
@@ -325,17 +329,21 @@ export class LevelGenerator {
             const topEnd = gapCenter - gapSize / 2;
             const botStart = gapCenter + gapSize / 2;
 
-            // Ceiling block pillar — spike tip points DOWN into gap
+            // Ceiling block pillar — spike touches last block, points DOWN
+            let lastTopUfo = this.ceilingY + 25;
             for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
                 obstacles.push({ type: 'block', x: cx, y });
+                lastTopUfo = y;
             }
-            obstacles.push({ type: 'spike', x: cx, y: topEnd, flipY: true });
+            obstacles.push({ type: 'spike', x: cx, y: lastTopUfo + 50, flipY: true });
 
-            // Floor block pillar — spike tip points UP into gap
+            // Floor block pillar — spike touches last block, points UP
+            let lastBotUfo = this.groundY - 25;
             for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
                 obstacles.push({ type: 'block', x: cx, y });
+                lastBotUfo = y;
             }
-            obstacles.push({ type: 'spike', x: cx, y: botStart });
+            obstacles.push({ type: 'spike', x: cx, y: lastBotUfo - 50 });
 
             // Floating single-block island with spike on top, positioned in the gap midpoint
             if (i % 2 === 1) {
@@ -366,17 +374,21 @@ export class LevelGenerator {
             const topEnd = gapY - gapSize / 2;
             const botStart = gapY + gapSize / 2;
 
-            // Ceiling block pillar — spike tip points DOWN into gap
+            // Ceiling block pillar — spike touches last block, points DOWN
+            let lastTopWave = this.ceilingY + 25;
             for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
                 obstacles.push({ type: 'block', x: currentX, y });
+                lastTopWave = y;
             }
-            obstacles.push({ type: 'spike', x: currentX, y: topEnd, flipY: true });
+            obstacles.push({ type: 'spike', x: currentX, y: lastTopWave + 50, flipY: true });
 
-            // Floor block pillar — spike tip points UP into gap
+            // Floor block pillar — spike touches last block, points UP
+            let lastBotWave = this.groundY - 25;
             for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
                 obstacles.push({ type: 'block', x: currentX, y });
+                lastBotWave = y;
             }
-            obstacles.push({ type: 'spike', x: currentX, y: botStart });
+            obstacles.push({ type: 'spike', x: currentX, y: lastBotWave - 50 });
 
             currentX += baseSpacing + random() * 50;
         }
