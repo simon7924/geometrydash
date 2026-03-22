@@ -175,73 +175,98 @@ export class EndlessGenerator {
     }
 
     // ==================== SHIP CHUNKS ====================
+    // Helpers for building block pillars with spike tips
+
+    // Block column from ceiling down to 'endY', spike at bottom tip
+    _shipCeilingPillar(obs, cx, endY) {
+        for (let y = this.ceilingY + 25; y <= endY; y += 50) {
+            obs.push({ type: 'block', x: cx, y });
+        }
+        obs.push({ type: 'spike', x: cx, y: endY + 50 });
+    }
+
+    // Block column from floor up to 'endY', spike at top tip (pointing up = default)
+    _shipFloorPillar(obs, cx, endY) {
+        for (let y = this.groundY - 25; y >= endY; y -= 50) {
+            obs.push({ type: 'block', x: cx, y });
+        }
+        obs.push({ type: 'spike', x: cx, y: endY - 50 });
+    }
+
+    // Floating block platform: 2-wide block with spikes on top and bottom
+    _shipFloatingPlatform(obs, cx, cy) {
+        obs.push({ type: 'block', x: cx,      y: cy });
+        obs.push({ type: 'block', x: cx + 50, y: cy });
+        obs.push({ type: 'spike', x: cx,      y: cy - 50 });       // top spikes
+        obs.push({ type: 'spike', x: cx + 50, y: cy - 50 });
+        obs.push({ type: 'spike', x: cx,      y: cy + 50, flipY: true }); // bottom spikes
+        obs.push({ type: 'spike', x: cx + 50, y: cy + 50, flipY: true });
+    }
 
     chunk_ship_wide(x) {
         const obs = [];
-        // Floor and ceiling spikes to prevent hugging walls
-        for (let i = 0; i < 5; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
-        }
-        // 3 pillars with centered gap
-        const pillars = [{ cx: x + 220, center: 320 }, { cx: x + 550, center: 300 }, { cx: x + 880, center: 340 }];
-        const gapSize = 270;
-        pillars.forEach(({ cx, center }) => {
-            const top = center - gapSize / 2;
-            const bot = center + gapSize / 2;
-            for (let y = this.playableTop; y < top; y += 50) {
-                obs.push({ type: 'spike', x: cx, y, flipY: true });
-            }
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obs.push({ type: 'spike', x: cx, y });
-            }
-        });
+        // Pillar 1: floor pillar with wide gap center at 320
+        // Gap: 185-455 → floor pillar up to 455, ceiling pillar down to 185
+        this._shipCeilingPillar(obs, x + 220, 185);
+        this._shipFloorPillar(obs, x + 220, 455);
+        // Pillar 2: floor pillar, gap center 300 → floor to 435, ceiling to 165
+        this._shipCeilingPillar(obs, x + 550, 165);
+        this._shipFloorPillar(obs, x + 550, 435);
+        // Pillar 3: gap center 340 → floor to 475, ceiling to 205
+        this._shipCeilingPillar(obs, x + 880, 205);
+        this._shipFloorPillar(obs, x + 880, 475);
+        // Floating platforms mid-section between pillars
+        this._shipFloatingPlatform(obs, x + 370, 310);
+        this._shipFloatingPlatform(obs, x + 700, 290);
         return { obstacles: obs, mode: 'SHIP', width: 1100 };
     }
 
     chunk_ship_narrow(x) {
         const obs = [];
-        // Floor and ceiling spikes to prevent hugging walls
-        for (let i = 0; i < 5; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
-        }
-        // 4 pillars with centered gap
-        const pillars = [{ cx: x + 180, center: 300 }, { cx: x + 430, center: 380 }, { cx: x + 680, center: 280 }, { cx: x + 930, center: 360 }];
-        const gapSize = 240;
-        pillars.forEach(({ cx, center }) => {
-            const top = center - gapSize / 2;
-            const bot = center + gapSize / 2;
-            for (let y = this.playableTop; y < top; y += 50) {
-                obs.push({ type: 'spike', x: cx, y, flipY: true });
-            }
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obs.push({ type: 'spike', x: cx, y });
-            }
+        // 4 closer pillars, tighter gap (240px), alternating gap centers
+        // [300, 380, 280, 360]
+        const defs = [
+            { cx: x + 180, center: 300 },
+            { cx: x + 430, center: 380 },
+            { cx: x + 680, center: 280 },
+            { cx: x + 930, center: 360 },
+        ];
+        const half = 120; // half of 240 gap
+        defs.forEach(({ cx, center }) => {
+            this._shipCeilingPillar(obs, cx, center - half - 50);
+            this._shipFloorPillar(obs, cx, center + half + 50);
         });
+        // Small floating single-block hazards in the gaps
+        obs.push({ type: 'block', x: x + 300, y: 330 });
+        obs.push({ type: 'spike', x: x + 300, y: 280 });
+        obs.push({ type: 'spike', x: x + 300, y: 380, flipY: true });
+        obs.push({ type: 'block', x: x + 800, y: 310 });
+        obs.push({ type: 'spike', x: x + 800, y: 260 });
+        obs.push({ type: 'spike', x: x + 800, y: 360, flipY: true });
         return { obstacles: obs, mode: 'SHIP', width: 1100 };
     }
 
     chunk_ship_zigzag(x) {
         const obs = [];
-        // Floor and ceiling spikes to prevent hugging walls
-        for (let i = 0; i < 5; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
-        }
-        // 4 pillars alternating high/low gap centers
-        const pillars = [{ cx: x + 180, center: 260 }, { cx: x + 430, center: 420 }, { cx: x + 680, center: 240 }, { cx: x + 930, center: 400 }];
-        const gapSize = 250;
-        pillars.forEach(({ cx, center }) => {
-            const top = center - gapSize / 2;
-            const bot = center + gapSize / 2;
-            for (let y = this.playableTop; y < top; y += 50) {
-                obs.push({ type: 'spike', x: cx, y, flipY: true });
-            }
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obs.push({ type: 'spike', x: cx, y });
-            }
+        // 4 pillars alternating high/low, forcing the player to zigzag
+        const defs = [
+            { cx: x + 180, center: 240 },
+            { cx: x + 430, center: 430 },
+            { cx: x + 680, center: 220 },
+            { cx: x + 930, center: 410 },
+        ];
+        const half = 125; // half of 250 gap
+        defs.forEach(({ cx, center }) => {
+            this._shipCeilingPillar(obs, cx, center - half - 50);
+            this._shipFloorPillar(obs, cx, center + half + 50);
         });
+        // Floating hazard blocks in the wide open areas to break them up
+        // Between pillar 1 (top gap) and pillar 2 (bottom gap): place obstacle mid-height
+        obs.push({ type: 'block', x: x + 300, y: 420 });
+        obs.push({ type: 'spike', x: x + 300, y: 370 });
+        // Between pillar 3 (top gap) and pillar 4 (bottom gap)
+        obs.push({ type: 'block', x: x + 800, y: 400 });
+        obs.push({ type: 'spike', x: x + 800, y: 350 });
         return { obstacles: obs, mode: 'SHIP', width: 1100 };
     }
 
@@ -281,84 +306,123 @@ export class EndlessGenerator {
 
     // ==================== UFO CHUNKS ====================
 
+    // Floating block island: blocks stacked 2 tall, spikes on top and below
+    _ufoIsland(obs, cx, cy, width = 2) {
+        for (let i = 0; i < width; i++) {
+            obs.push({ type: 'block', x: cx + i * 50, y: cy });
+            obs.push({ type: 'block', x: cx + i * 50, y: cy + 50 });
+            obs.push({ type: 'spike', x: cx + i * 50, y: cy - 50 });           // spike on top
+            obs.push({ type: 'spike', x: cx + i * 50, y: cy + 100, flipY: true }); // spike below
+        }
+    }
+
     chunk_ufo_scattered(x) {
         const obs = [];
-        // Floor and ceiling spikes every 200px to prevent sitting
-        for (let i = 0; i < 6; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
+        // Floor block wall with spike top, ceiling block wall with spike bottom — forces player off edges
+        // Floor ridge at left
+        for (let bx = x + 150; bx <= x + 250; bx += 50) {
+            obs.push({ type: 'block', x: bx, y: this.groundY - 25 });
+            obs.push({ type: 'spike', x: bx, y: this.groundY - 75 });
         }
-        // Mid-air obstacles to dodge
-        const heights = [300, 420, 260, 380, 320];
-        heights.forEach((y, i) => {
-            obs.push({ type: 'spike', x: x + 260 + i * 220, y });
-        });
+        // Ceiling ridge at right
+        for (let bx = x + 1100; bx <= x + 1200; bx += 50) {
+            obs.push({ type: 'block', x: bx, y: this.ceilingY + 25 });
+            obs.push({ type: 'spike', x: bx, y: this.ceilingY + 75, flipY: true });
+        }
+        // Floating islands at varying heights — player must tap-boost between them
+        this._ufoIsland(obs, x + 380, 270, 2);   // high island
+        this._ufoIsland(obs, x + 620, 390, 2);   // low island
+        this._ufoIsland(obs, x + 860, 250, 2);   // high island
+        // Single spike hazards in open space between islands
+        obs.push({ type: 'spike', x: x + 500, y: 430 });
+        obs.push({ type: 'spike', x: x + 740, y: 290 });
+        obs.push({ type: 'spike', x: x + 980, y: 370 });
         return { obstacles: obs, mode: 'UFO', width: 1400 };
     }
 
     chunk_ufo_columns(x) {
         const obs = [];
-        // Floor and ceiling spikes every 200px to prevent sitting
-        for (let i = 0; i < 6; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
-        }
-        // Column pairs with gap in middle
-        const centers = [320, 380, 300, 360];
-        centers.forEach((center, i) => {
-            const cx = x + 200 + i * 320;
-            const gapSize = 220;
-            obs.push({ type: 'spike', x: cx, y: center - gapSize / 2 - 20, flipY: true });
-            obs.push({ type: 'spike', x: cx, y: center + gapSize / 2 + 20 });
+        // 4 column obstacles: block stack from floor with spike top, paired with ceiling stack below
+        // Player must navigate through the gap in the middle
+        const defs = [
+            { cx: x + 200, gapCenter: 320 },
+            { cx: x + 500, gapCenter: 390 },
+            { cx: x + 800, gapCenter: 300 },
+            { cx: x + 1100, gapCenter: 370 },
+        ];
+        const half = 110; // half gap = 220 total
+        defs.forEach(({ cx, gapCenter }) => {
+            // Ceiling column: blocks from ceiling down to gap top, spike pointing down at tip
+            for (let y = this.ceilingY + 25; y <= gapCenter - half - 50; y += 50) {
+                obs.push({ type: 'block', x: cx, y });
+            }
+            obs.push({ type: 'spike', x: cx, y: gapCenter - half });
+            // Floor column: blocks from floor up to gap bottom, spike pointing up at tip
+            for (let y = this.groundY - 25; y >= gapCenter + half + 50; y -= 50) {
+                obs.push({ type: 'block', x: cx, y });
+            }
+            obs.push({ type: 'spike', x: cx, y: gapCenter + half });
         });
+        // Floating single block in each wide gap to add extra obstacle
+        obs.push({ type: 'block', x: x + 340, y: 355 });
+        obs.push({ type: 'spike', x: x + 340, y: 305 });
+        obs.push({ type: 'block', x: x + 640, y: 340 });
+        obs.push({ type: 'spike', x: x + 640, y: 290 });
         return { obstacles: obs, mode: 'UFO', width: 1400 };
     }
 
     // ==================== WAVE CHUNKS ====================
+    // Wave pillars: blocks form the solid body, spike at the opening tip
+
+    // Build a full-height wave pillar: ceiling block column + floor block column with gap opening
+    // Ceiling column has spike at bottom tip, floor column has spike at top tip
+    _wavePillar(obs, cx, gapCenter, gapSize) {
+        const half = gapSize / 2;
+        const topEnd = gapCenter - half;
+        const botStart = gapCenter + half;
+        // Ceiling blocks
+        for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
+            obs.push({ type: 'block', x: cx, y });
+        }
+        obs.push({ type: 'spike', x: cx, y: topEnd });          // spike tip pointing down into gap
+        // Floor blocks
+        for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
+            obs.push({ type: 'block', x: cx, y });
+        }
+        obs.push({ type: 'spike', x: cx, y: botStart, flipY: true }); // spike tip pointing up into gap
+    }
 
     chunk_wave_gentle(x) {
         const obs = [];
-        // Floor and ceiling spikes to prevent sitting
-        for (let i = 0; i < 6; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
-        }
-        // 5 pillars alternating gap centers for a gentle wave pattern
-        const pillars = [{ cx: x + 150, center: 340 }, { cx: x + 370, center: 290 }, { cx: x + 590, center: 370 }, { cx: x + 810, center: 300 }, { cx: x + 1030, center: 350 }];
-        const gapSize = 230;
-        pillars.forEach(({ cx, center }) => {
-            const top = center - gapSize / 2;
-            const bot = center + gapSize / 2;
-            for (let y = this.playableTop; y < top; y += 50) {
-                obs.push({ type: 'spike', x: cx, y, flipY: true });
-            }
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obs.push({ type: 'spike', x: cx, y });
-            }
-        });
+        // 5 pillars with gentle alternating gaps — wave path is subtle
+        const pillars = [
+            { cx: x + 150,  center: 340 },
+            { cx: x + 370,  center: 285 },
+            { cx: x + 590,  center: 370 },
+            { cx: x + 810,  center: 295 },
+            { cx: x + 1030, center: 355 },
+        ];
+        pillars.forEach(({ cx, center }) => this._wavePillar(obs, cx, center, 220));
+        // Small floating block between pillars 2 and 3, above the wave path — visual interest
+        obs.push({ type: 'block', x: x + 480, y: 200 });
+        obs.push({ type: 'spike', x: x + 480, y: 250, flipY: true });
+        obs.push({ type: 'block', x: x + 700, y: 470 });
+        obs.push({ type: 'spike', x: x + 700, y: 420 });
         return { obstacles: obs, mode: 'WAVE', width: 1200 };
     }
 
     chunk_wave_tight(x) {
         const obs = [];
-        // Floor and ceiling spikes to prevent sitting
-        for (let i = 0; i < 6; i++) {
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.groundY - 57 });
-            obs.push({ type: 'spike', x: x + 150 + i * 220, y: this.ceilingY + 57, flipY: true });
-        }
-        // 5 pillars with tight gap and dramatic high/low alternation
-        const pillars = [{ cx: x + 150, center: 260 }, { cx: x + 370, center: 420 }, { cx: x + 590, center: 250 }, { cx: x + 810, center: 410 }, { cx: x + 1030, center: 280 }];
-        const gapSize = 210;
-        pillars.forEach(({ cx, center }) => {
-            const top = center - gapSize / 2;
-            const bot = center + gapSize / 2;
-            for (let y = this.playableTop; y < top; y += 50) {
-                obs.push({ type: 'spike', x: cx, y, flipY: true });
-            }
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obs.push({ type: 'spike', x: cx, y });
-            }
-        });
+        // 5 pillars with dramatic high/low zigzag — tight gap forces precision
+        const pillars = [
+            { cx: x + 150,  center: 250 },
+            { cx: x + 370,  center: 430 },
+            { cx: x + 590,  center: 240 },
+            { cx: x + 810,  center: 420 },
+            { cx: x + 1030, center: 270 },
+        ];
+        pillars.forEach(({ cx, center }) => this._wavePillar(obs, cx, center, 200));
+        // No floating extras — tight enough already
         return { obstacles: obs, mode: 'WAVE', width: 1200 };
     }
 

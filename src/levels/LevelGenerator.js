@@ -212,37 +212,44 @@ export class LevelGenerator {
     }
 
     // ==================== SHIP SECTION ====================
-    // Corridors with top and bottom spikes - fly through gaps
-    // Ship holds to rise, releases to fall. Create passages at varying heights.
+    // Block pillar corridors — purple block body with spike tips at the gap opening.
+    // Floating block platforms between pillars add visual variety.
     generateShipSection(section, config, random) {
         const obstacles = [];
-        const wallSpikes = config.difficulty >= 4;
         const sectionLen = section.endX - section.startX;
         const numColumns = Math.max(3, Math.floor(sectionLen / 300));
         const colSpacing = sectionLen / (numColumns + 1);
-
-        // Alternate gap center high/low for a weaving path
         const gapCenters = [280, 400, 260, 420, 300, 380];
-        const gapSize = 220;
+        const gapSize = config.difficulty >= 5 ? 200 : 230;
 
         for (let i = 0; i < numColumns; i++) {
             const cx = section.startX + colSpacing * (i + 1);
             const gapCenter = gapCenters[i % gapCenters.length];
-            const top = gapCenter - gapSize / 2;
-            const bot = gapCenter + gapSize / 2;
+            const topEnd = gapCenter - gapSize / 2;
+            const botStart = gapCenter + gapSize / 2;
 
-            // Spike pillar above gap
-            for (let y = this.playableTop; y < top; y += 50) {
-                obstacles.push({ type: 'spike', x: cx, y, flipY: true });
+            // Ceiling block pillar — blocks from ceiling down, spike tip at gap edge
+            for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
+                obstacles.push({ type: 'block', x: cx, y });
             }
-            // Spike pillar below gap
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obstacles.push({ type: 'spike', x: cx, y });
+            obstacles.push({ type: 'spike', x: cx, y: topEnd });
+
+            // Floor block pillar — blocks from floor up, spike tip at gap edge
+            for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
+                obstacles.push({ type: 'block', x: cx, y });
             }
-            // Floor/ceiling spikes at same column x
-            if (wallSpikes) {
-                obstacles.push({ type: 'spike', x: cx, y: this.groundY - 57 });
-                obstacles.push({ type: 'spike', x: cx, y: this.ceilingY + 57, flipY: true });
+            obstacles.push({ type: 'spike', x: cx, y: botStart, flipY: true });
+
+            // Floating 2-block platform with spikes top+bottom between alternating pillars
+            if (i % 2 === 0 && i + 1 < numColumns) {
+                const midX = cx + colSpacing / 2;
+                const midY = (gapCenter + gapCenters[(i + 1) % gapCenters.length]) / 2;
+                obstacles.push({ type: 'block', x: midX,      y: midY });
+                obstacles.push({ type: 'block', x: midX + 50, y: midY });
+                obstacles.push({ type: 'spike', x: midX,      y: midY - 50 });
+                obstacles.push({ type: 'spike', x: midX + 50, y: midY - 50 });
+                obstacles.push({ type: 'spike', x: midX,      y: midY + 50, flipY: true });
+                obstacles.push({ type: 'spike', x: midX + 50, y: midY + 50, flipY: true });
             }
         }
 
@@ -302,37 +309,40 @@ export class LevelGenerator {
     }
 
     // ==================== UFO SECTION ====================
-    // Floating spikes at various heights - tap to boost upward
-    // UFO falls with gravity, each tap gives a small upward boost (multi-jump)
+    // Block pillar columns from floor+ceiling with gap in middle, plus floating block islands.
+    // UFO taps to boost upward — player must navigate through gap and dodge islands.
     generateUFOSection(section, config, random) {
         const obstacles = [];
-        const wallSpikes = config.difficulty >= 4;
         const sectionLen = section.endX - section.startX;
         const numColumns = Math.max(3, Math.floor(sectionLen / 280));
         const colSpacing = sectionLen / (numColumns + 1);
-
-        // Alternate gap center high/low
         const gapCenters = [300, 420, 260, 400, 280, 380];
-        const gapSize = 200;
+        const gapSize = config.difficulty >= 5 ? 190 : 210;
 
         for (let i = 0; i < numColumns; i++) {
             const cx = section.startX + colSpacing * (i + 1);
             const gapCenter = gapCenters[i % gapCenters.length];
-            const top = gapCenter - gapSize / 2;
-            const bot = gapCenter + gapSize / 2;
+            const topEnd = gapCenter - gapSize / 2;
+            const botStart = gapCenter + gapSize / 2;
 
-            // Spike pillar above gap
-            for (let y = this.playableTop; y < top; y += 50) {
-                obstacles.push({ type: 'spike', x: cx, y, flipY: true });
+            // Ceiling block pillar with spike tip
+            for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
+                obstacles.push({ type: 'block', x: cx, y });
             }
-            // Spike pillar below gap
-            for (let y = bot; y < this.playableBottom; y += 50) {
-                obstacles.push({ type: 'spike', x: cx, y });
+            obstacles.push({ type: 'spike', x: cx, y: topEnd });
+
+            // Floor block pillar with spike tip
+            for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
+                obstacles.push({ type: 'block', x: cx, y });
             }
-            // Floor/ceiling spikes at same column x
-            if (wallSpikes) {
-                obstacles.push({ type: 'spike', x: cx, y: this.groundY - 57 });
-                obstacles.push({ type: 'spike', x: cx, y: this.ceilingY + 57, flipY: true });
+            obstacles.push({ type: 'spike', x: cx, y: botStart, flipY: true });
+
+            // Floating single-block island with spike on top, positioned in the gap midpoint
+            if (i % 2 === 1) {
+                const islandY = gapCenter - 20;
+                obstacles.push({ type: 'block', x: cx - 25, y: islandY });
+                obstacles.push({ type: 'spike', x: cx - 25, y: islandY - 50 });
+                obstacles.push({ type: 'spike', x: cx - 25, y: islandY + 50, flipY: true });
             }
         }
 
@@ -340,36 +350,35 @@ export class LevelGenerator {
     }
 
     // ==================== WAVE SECTION ====================
-    // Wave moves diagonally: hold = up-right, release = down-right
-    // Create block walls with gaps at different heights to weave through
+    // Block pillar walls with a gap — wave flies through diagonally.
+    // Blocks form the solid pillar body, spikes tip into the gap opening.
     generateWaveSection(section, config, random) {
         const obstacles = [];
-        const wallSpikes = config.difficulty >= 4;
         let currentX = section.startX;
-        const spacing = 200 + random() * 40;
-        let gapY = 350; // Start in middle
+        const baseSpacing = 210 + random() * 30;
+        let gapY = 350;
 
         while (currentX < section.endX) {
-            // Move the gap up or down to create a weaving path
-            const gapShift = (random() - 0.5) * 200;
-            gapY = Math.max(this.playableTop + 100, Math.min(this.playableBottom - 100, gapY + gapShift));
-            const gapSize = 150 + random() * 40;
+            const gapShift = (random() - 0.5) * 180;
+            gapY = Math.max(this.playableTop + 110, Math.min(this.playableBottom - 110, gapY + gapShift));
+            const gapSize = config.difficulty >= 5 ? 160 : 185;
 
-            // Top spike pillar
-            for (let y = this.playableTop; y < gapY - gapSize / 2; y += 55) {
-                obstacles.push({ type: 'spike', x: currentX, y, flipY: true });
-            }
-            // Bottom spike pillar
-            for (let y = gapY + gapSize / 2; y < this.playableBottom; y += 55) {
-                obstacles.push({ type: 'spike', x: currentX, y });
-            }
-            // Floor/ceiling spikes at same column x
-            if (wallSpikes) {
-                obstacles.push({ type: 'spike', x: currentX, y: this.groundY - 57 });
-                obstacles.push({ type: 'spike', x: currentX, y: this.ceilingY + 57, flipY: true });
-            }
+            const topEnd = gapY - gapSize / 2;
+            const botStart = gapY + gapSize / 2;
 
-            currentX += spacing + random() * 60;
+            // Ceiling block pillar with spike tip pointing into gap
+            for (let y = this.ceilingY + 25; y <= topEnd - 50; y += 50) {
+                obstacles.push({ type: 'block', x: currentX, y });
+            }
+            obstacles.push({ type: 'spike', x: currentX, y: topEnd });
+
+            // Floor block pillar with spike tip pointing into gap
+            for (let y = this.groundY - 25; y >= botStart + 50; y -= 50) {
+                obstacles.push({ type: 'block', x: currentX, y });
+            }
+            obstacles.push({ type: 'spike', x: currentX, y: botStart, flipY: true });
+
+            currentX += baseSpacing + random() * 50;
         }
 
         return obstacles;
