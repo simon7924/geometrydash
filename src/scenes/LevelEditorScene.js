@@ -53,18 +53,11 @@ export class LevelEditorScene extends Phaser.Scene {
         const TOOLBAR_W = 160;
         const PLAY_AREA_W = W - TOOLBAR_W;
 
-        // ── World camera (scrollable) ──────────────────────────────────────
+        // ── Single scrollable camera ───────────────────────────────────────
         this.worldCam = this.cameras.main;
         this.worldCam.setBounds(0, 0, LEVEL_LENGTH + W, H);
         this.worldCam.setScroll(0, 0);
-
-        // ── Static UI camera (fixed, covers toolbar) ───────────────────────
-        this.uiCam = this.cameras.add(0, 0, W, H);
-        this.uiCam.setScroll(0, 0);
-
-        // ── Background ─────────────────────────────────────────────────────
-        this.add.rectangle(LEVEL_LENGTH / 2 + TOOLBAR_W / 2, H / 2,
-            LEVEL_LENGTH + TOOLBAR_W, H, 0x1a1a2e).setScrollFactor(0, 0);
+        this.cameras.main.setBackgroundColor(0x1a1a2e);
 
         // Level bounds line (set after _buildNameInput restores _levelLength)
         this._boundLine = this.add.rectangle(LEVEL_LENGTH + TOOLBAR_W, H / 2, 4, H, 0xff0000)
@@ -158,8 +151,6 @@ export class LevelEditorScene extends Phaser.Scene {
             if (e.ctrlKey || e.metaKey) { e.preventDefault(); this._save(); }
         });
 
-        // Exclude toolbar+scrollbar from world cam
-        this.worldCam.ignore(this._uiObjects || []);
 
         // Restore saved state from test play
         if (this._savedObjects) {
@@ -264,8 +255,6 @@ export class LevelEditorScene extends Phaser.Scene {
             font: '10px Arial', fill: '#888888'
         }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(32);
         this._uiObjects.push(this._statusText);
-
-        this.worldCam.ignore(this._uiObjects);
     }
 
     _buildNameInput(W, toolbarW) {
@@ -386,12 +375,15 @@ export class LevelEditorScene extends Phaser.Scene {
     }
 
     // Snap world coords to grid. Returns null if out of play area.
+    // worldX = pointer.x + scrollX, worldY = pointer.y (no Y scroll)
     _snap(worldX, worldY) {
         const TOOLBAR_W = 160;
-        if (worldX < TOOLBAR_W || worldX > this._levelLength + TOOLBAR_W) return null;
+        // Level space: x offset from toolbar (world coords include scrollX)
+        const levelX = worldX - TOOLBAR_W;
+        if (levelX < 0 || levelX > this._levelLength) return null;
         if (worldY < CEILING_Y || worldY > GROUND_Y) return null;
 
-        const gx = Math.floor((worldX - TOOLBAR_W) / GRID);
+        const gx = Math.floor(levelX / GRID);
         const gy = Math.floor((worldY - CEILING_Y) / GRID);
         const x = TOOLBAR_W + gx * GRID + GRID / 2;
         const y = CEILING_Y + gy * GRID + GRID / 2;
