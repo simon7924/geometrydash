@@ -145,12 +145,14 @@ export class LevelEditorScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys({ left: 'A', right: 'D' });
 
-        // Spike rotation (Q = CCW, E = CW)
+        // Spike rotation (Q = CCW, E = CW) — redraw ghost immediately
         this.input.keyboard.on('keydown-Q', () => {
             this.spikeRotation = (this.spikeRotation + 270) % 360;
+            this._redrawGhost();
         });
         this.input.keyboard.on('keydown-E', () => {
             this.spikeRotation = (this.spikeRotation + 90) % 360;
+            this._redrawGhost();
         });
 
         // Back / save shortcuts
@@ -351,18 +353,11 @@ export class LevelEditorScene extends Phaser.Scene {
         }
     }
 
-    _onMove(pointer, toolbarW) {
-        if (this._dialogOpen || pointer.x < toolbarW) { this.ghost.setVisible(false); return; }
-
-        const worldX = pointer.x + this.worldCam.scrollX;
-        const worldY = pointer.y + this.worldCam.scrollY;
-        const snapped = this._snap(worldX, worldY);
-        if (!snapped) { this.ghost.setVisible(false); return; }
-
-        // Redraw ghost at snapped position
-        this.ghost.clear().setVisible(true);
-        const cx = snapped.x, cy = snapped.y;
+    _redrawGhost() {
+        if (!this._lastSnapped) return;
+        const { x: cx, y: cy } = this._lastSnapped;
         const h = GRID - 8, hw = GRID / 2 - 4;
+        this.ghost.clear().setVisible(true);
         if (this.activeTool === 'spike') {
             this.ghost.fillStyle(0xff4444, 1);
             const rot = this.spikeRotation;
@@ -383,6 +378,18 @@ export class LevelEditorScene extends Phaser.Scene {
             this.ghost.fillStyle(PORTAL_COLORS[mode] || 0xffffff, 1);
             this.ghost.fillRect(cx - 16, CEILING_Y, 32, GROUND_Y - CEILING_Y);
         }
+    }
+
+    _onMove(pointer, toolbarW) {
+        if (this._dialogOpen || pointer.x < toolbarW) { this.ghost.setVisible(false); return; }
+
+        const worldX = pointer.x + this.worldCam.scrollX;
+        const worldY = pointer.y + this.worldCam.scrollY;
+        const snapped = this._snap(worldX, worldY);
+        if (!snapped) { this.ghost.setVisible(false); return; }
+
+        this._lastSnapped = snapped;
+        this._redrawGhost();
 
         // Drag-place
         if (pointer.isDown && pointer.x >= toolbarW) {
