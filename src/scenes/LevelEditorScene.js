@@ -10,7 +10,6 @@ const CAM_SPEED = 400; // px/s when scrolling
 // Obstacle palette entries
 const TOOLS = [
     { id: 'spike',        label: '▲ Spike',          color: 0xff4444 },
-    { id: 'spike_ceil',   label: '▼ Ceil Spike',     color: 0xff8844 },
     { id: 'block',        label: '■ Block',           color: 0x4488ff },
     { id: 'portal_CUBE',  label: '◆ Cube Portal',    color: 0x00ff88 },
     { id: 'portal_SHIP',  label: '◆ Ship Portal',    color: 0x00ccff },
@@ -37,6 +36,7 @@ export class LevelEditorScene extends Phaser.Scene {
         this.profile = data?.profile || null;
         this.isGuest = data?.isGuest || false;
         this.activeTool = 'spike';
+        this.spikeRotation = 0; // 0=up, 90=right, 180=down, 270=left
         this.placedObjects = [];
         this.camX = 0;
         this.saving = false;
@@ -83,9 +83,9 @@ export class LevelEditorScene extends Phaser.Scene {
         }
         this.gridGraphics.strokePath();
 
-        // ── Ghost cursor ───────────────────────────────────────────────────
-        this.ghost = this.add.rectangle(0, 0, GRID, GRID, 0xffffff, 0.25)
-            .setDepth(20).setVisible(false);
+        // ── Ghost cursor (graphics, redrawn each move) ─────────────────────
+        this.ghost = this.add.graphics().setDepth(20).setAlpha(0.4).setVisible(false);
+        this._ghostPos = { x: 0, y: 0 };
 
         // ── Toolbar (drawn on UI cam, ignore world scroll) ─────────────────
         this._buildToolbar(TOOLBAR_W, H);
@@ -145,6 +145,14 @@ export class LevelEditorScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys({ left: 'A', right: 'D' });
 
+        // Spike rotation (Q = CCW, E = CW)
+        this.input.keyboard.on('keydown-Q', () => {
+            this.spikeRotation = (this.spikeRotation + 270) % 360;
+        });
+        this.input.keyboard.on('keydown-E', () => {
+            this.spikeRotation = (this.spikeRotation + 90) % 360;
+        });
+
         // Back / save shortcuts
         this.input.keyboard.on('keydown-ESC', () => this._goBack());
         this.input.keyboard.on('keydown-S', (e) => {
@@ -154,7 +162,12 @@ export class LevelEditorScene extends Phaser.Scene {
 
         // Restore saved state from test play
         if (this._savedObjects) {
-            this._savedObjects.forEach(o => this._place(o.gx, o.gy, 0, 0, o.type));
+            this._savedObjects.forEach(o => {
+                const prevRot = this.spikeRotation;
+                this.spikeRotation = o.rotation || 0;
+                this._place(o.gx, o.gy, 0, 0, o.type);
+                this.spikeRotation = prevRot;
+            });
         }
     }
 
@@ -346,18 +359,29 @@ export class LevelEditorScene extends Phaser.Scene {
         const snapped = this._snap(worldX, worldY);
         if (!snapped) { this.ghost.setVisible(false); return; }
 
-        this.ghost.setPosition(snapped.x, snapped.y).setVisible(true);
-
-        // Color ghost by tool
-        if (this.activeTool === 'erase') {
-            this.ghost.setFillStyle(0xff0000, 0.3);
+        // Redraw ghost at snapped position
+        this.ghost.clear().setVisible(true);
+        const cx = snapped.x, cy = snapped.y;
+        const h = GRID - 8, hw = GRID / 2 - 4;
+        if (this.activeTool === 'spike') {
+            this.ghost.fillStyle(0xff4444, 1);
+            const rot = this.spikeRotation;
+            let pts;
+            if (rot === 0)        pts = [cx, cy - h/2,  cx - hw, cy + h/2,  cx + hw, cy + h/2];
+            else if (rot === 180) pts = [cx, cy + h/2,  cx + hw, cy - h/2,  cx - hw, cy - h/2];
+            else if (rot === 90)  pts = [cx + h/2, cy,  cx - h/2, cy - hw,  cx - h/2, cy + hw];
+            else                  pts = [cx - h/2, cy,  cx + h/2, cy + hw,  cx + h/2, cy - hw];
+            this.ghost.fillTriangle(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5]);
+        } else if (this.activeTool === 'erase') {
+            this.ghost.fillStyle(0xff0000, 1);
+            this.ghost.fillRect(cx - GRID/2 + 4, cy - GRID/2 + 4, GRID - 8, GRID - 8);
+        } else if (this.activeTool === 'block') {
+            this.ghost.fillStyle(0x4488ff, 1);
+            this.ghost.fillRect(cx - GRID/2 + 2, cy - GRID/2 + 2, GRID - 4, GRID - 4);
         } else if (this.activeTool.startsWith('portal_')) {
             const mode = this.activeTool.replace('portal_', '');
-            this.ghost.setFillStyle(PORTAL_COLORS[mode] || 0xffffff, 0.3);
-        } else if (this.activeTool === 'block') {
-            this.ghost.setFillStyle(0x4488ff, 0.3);
-        } else {
-            this.ghost.setFillStyle(0xff4444, 0.3);
+            this.ghost.fillStyle(PORTAL_COLORS[mode] || 0xffffff, 1);
+            this.ghost.fillRect(cx - 16, CEILING_Y, 32, GROUND_Y - CEILING_Y);
         }
 
         // Drag-place
@@ -372,6 +396,32 @@ export class LevelEditorScene extends Phaser.Scene {
         const worldY = pointer.y + this.worldCam.scrollY;
         const snapped = this._snap(worldX, worldY);
         if (snapped) this._place(snapped.gx, snapped.gy, worldX, worldY);
+    }
+
+    // Draw a spike triangle at (cx, cy) with given rotation (0/90/180/270)
+    // 0=tip up, 90=tip right, 180=tip down, 270=tip left
+    _drawSpike(cx, cy, rotation) {
+        const g = this.add.graphics().setDepth(15);
+        g.fillStyle(0xff4444, 1);
+        const h = GRID - 8;  // height of triangle
+        const hw = GRID / 2 - 4; // half-width of base
+        // Define triangle pointing UP, then rotate
+        let pts;
+        if (rotation === 0) {
+            // tip up
+            pts = [cx, cy - h / 2,  cx - hw, cy + h / 2,  cx + hw, cy + h / 2];
+        } else if (rotation === 180) {
+            // tip down
+            pts = [cx, cy + h / 2,  cx + hw, cy - h / 2,  cx - hw, cy - h / 2];
+        } else if (rotation === 90) {
+            // tip right
+            pts = [cx + h / 2, cy,  cx - h / 2, cy - hw,  cx - h / 2, cy + hw];
+        } else {
+            // tip left (270)
+            pts = [cx - h / 2, cy,  cx + h / 2, cy + hw,  cx + h / 2, cy - hw];
+        }
+        g.fillTriangle(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5]);
+        return g;
     }
 
     // Snap world coords to grid. Returns null if out of play area.
@@ -408,42 +458,16 @@ export class LevelEditorScene extends Phaser.Scene {
             if (existingPortal) { this.activeTool = prevTool; return; }
         }
 
-        // Don't stack: spikes/ceil-spikes use only column (gx), blocks use exact cell
-        const isSpike = this.activeTool === 'spike' || this.activeTool === 'spike_ceil';
-        if (isSpike) {
-            if (this.placedObjects.find(o => o.type === this.activeTool && o.gx === gx)) return;
-        } else {
-            if (this.placedObjects.find(o => o.gx === gx && o.gy === gy)) return;
-        }
+        // Don't stack on same cell
+        if (this.placedObjects.find(o => o.gx === gx && o.gy === gy)) return;
 
         const snapX = TOOLBAR_W + gx * GRID + GRID / 2;
         const snapY = CEILING_Y + gy * GRID + GRID / 2;
 
-        // Floor spikes always lock to ground, ceiling spikes always lock to ceiling
-        const floorSpikeY = GROUND_Y;       // base of spike (bottom of triangle)
-        const ceilSpikeY  = CEILING_Y;      // base of ceiling spike (top of triangle)
-
         let gameObj;
         if (this.activeTool === 'spike') {
-            // Triangle pointing up, base sitting on ground line
-            const g = this.add.graphics().setDepth(15);
-            g.fillStyle(0xff4444, 1);
-            g.fillTriangle(
-                snapX - GRID / 2 + 4, floorSpikeY,
-                snapX + GRID / 2 - 4, floorSpikeY,
-                snapX, floorSpikeY - GRID + 4
-            );
-            gameObj = g;
-        } else if (this.activeTool === 'spike_ceil') {
-            // Triangle pointing down, base sitting on ceiling line
-            const g = this.add.graphics().setDepth(15);
-            g.fillStyle(0xff8844, 1);
-            g.fillTriangle(
-                snapX - GRID / 2 + 4, ceilSpikeY,
-                snapX + GRID / 2 - 4, ceilSpikeY,
-                snapX, ceilSpikeY + GRID - 4
-            );
-            gameObj = g;
+            const rot = this.spikeRotation;
+            gameObj = this._drawSpike(snapX, snapY, rot);
         } else if (this.activeTool === 'block') {
             const g = this.add.graphics().setDepth(15);
             g.fillStyle(0x4488ff, 1);
@@ -465,16 +489,16 @@ export class LevelEditorScene extends Phaser.Scene {
             gameObj = [g, lbl]; // store both
         }
 
-        const entry = { type: this.activeTool, gx, gy, gameObj };
+        const rotation = (this.activeTool === 'spike') ? this.spikeRotation : 0;
+        const entry = { type: this.activeTool, gx, gy, rotation, gameObj };
         this.placedObjects.push(entry);
         if (forceTool) this.activeTool = prevTool;
     }
 
     _erase(gx, gy) {
-        // Portals and spikes: match by column only. Blocks: match exact cell.
+        // Portals: match by column only. Everything else: exact cell.
         const toRemove = this.placedObjects.filter(o => {
             if (o.type.startsWith('portal_')) return o.gx === gx;
-            if (o.type === 'spike' || o.type === 'spike_ceil') return o.gx === gx;
             return o.gx === gx && o.gy === gy;
         });
         toRemove.forEach(o => {
@@ -503,11 +527,7 @@ export class LevelEditorScene extends Phaser.Scene {
             const wy = CEILING_Y + o.gy * GRID + GRID / 2;
 
             if (o.type === 'spike') {
-                // Ground tile top = GROUND_Y-32=618, spike base at 618, sprite center = 618-25 = 593
-                obstacles.push({ type: 'spike', x: wx, y: GROUND_Y - 57, flipY: false });
-            } else if (o.type === 'spike_ceil') {
-                // Ceiling tile bottom = CEILING_Y+32=102, spike base at 102, sprite center = 102+25 = 127
-                obstacles.push({ type: 'spike', x: wx, y: CEILING_Y + 57, flipY: true });
+                obstacles.push({ type: 'spike', x: wx, y: wy, rotation: o.rotation || 0 });
             } else if (o.type === 'block') {
                 obstacles.push({ type: 'block', x: wx, y: wy });
             } else if (o.type.startsWith('portal_')) {
@@ -624,7 +644,7 @@ export class LevelEditorScene extends Phaser.Scene {
         const levelData = this._buildLevelData();
         levelData.id = '__editor_test__';
         // Serialize placed objects (strip Phaser gameObj refs) to restore after test
-        const savedObjects = this.placedObjects.map(o => ({ type: o.type, gx: o.gx, gy: o.gy }));
+        const savedObjects = this.placedObjects.map(o => ({ type: o.type, gx: o.gx, gy: o.gy, rotation: o.rotation || 0 }));
         this._cleanup();
         this.scene.start('GameScene', {
             user: this.user,

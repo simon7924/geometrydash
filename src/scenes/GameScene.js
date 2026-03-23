@@ -126,11 +126,18 @@ export class GameScene extends Phaser.Scene {
             this.level.obstacles.forEach(obs => {
                 if (obs.type === 'spike') {
                     const spike = this.hazards.create(obs.x, obs.y, 'spike');
-                    spike.setSize(30, 40);
-                    spike.setOffset(10, 10);
                     spike.setTint(spikeColor);
-                    if (obs.flipY) {
+                    if (obs.rotation !== undefined && obs.rotation !== 0) {
+                        spike.setAngle(obs.rotation);
+                        spike.setSize(30, 40);
+                        spike.setOffset(10, 10);
+                    } else if (obs.flipY) {
                         spike.setFlipY(true);
+                        spike.setSize(30, 40);
+                        spike.setOffset(10, 10);
+                    } else {
+                        spike.setSize(30, 40);
+                        spike.setOffset(10, 10);
                     }
                 } else if (obs.type === 'block') {
                     const block = this.solidBlocks.create(obs.x, obs.y, 'block');
