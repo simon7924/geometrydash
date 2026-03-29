@@ -43,26 +43,37 @@ export class LevelSelectScene extends Phaser.Scene {
         // Obstacles in first WORLD_W px
         const spikeColor = level.spikeColor || 0xff4444;
         const blockColor = 0x6a4a8a;
-        // spike size relative to preview
-        const hw = Math.max(3, 9 * sx);
-        const hh = Math.max(4, 11 * sy);
+        const hw = Math.max(3, 8 * sx);
+        const hh = Math.max(4, 10 * sy);
         const bSize = Math.max(4, 18 * sx);
+
+        // Threshold: obs.y within 80px of ground/ceiling counts as floor/ceiling spike
+        const GROUND_THRESH = GROUND_Y - 80;
+        const CEIL_THRESH = CEILING_Y + 80;
 
         level.obstacles.forEach(obs => {
             if (obs.x > WORLD_W || obs.x < 0) return;
             const px = ox + obs.x * sx;
-            const py = oy + obs.y * sy;
 
             if (obs.type === 'spike') {
                 gfx.fillStyle(spikeColor, 1);
-                if (obs.flipY) {
-                    // Ceiling spike: base at top (py - hh), tip points down (py + hh)
-                    gfx.fillTriangle(px, py + hh, px - hw, py - hh, px + hw, py - hh);
+                if (!obs.flipY && obs.y >= GROUND_THRESH) {
+                    // Floor spike — base sits on groundLineY
+                    gfx.fillTriangle(px, groundLineY - hh * 2, px - hw, groundLineY, px + hw, groundLineY);
+                } else if (obs.flipY && obs.y <= CEIL_THRESH) {
+                    // Ceiling spike — base sits on ceilLineY
+                    gfx.fillTriangle(px, ceilLineY + hh * 2, px - hw, ceilLineY, px + hw, ceilLineY);
                 } else {
-                    // Floor spike: base at bottom (py + hh), tip points up (py - hh)
-                    gfx.fillTriangle(px, py - hh, px - hw, py + hh, px + hw, py + hh);
+                    // Mid-air spike (pillar tip)
+                    const py = oy + obs.y * sy;
+                    if (obs.flipY) {
+                        gfx.fillTriangle(px, py + hh, px - hw, py - hh, px + hw, py - hh);
+                    } else {
+                        gfx.fillTriangle(px, py - hh, px - hw, py + hh, px + hw, py + hh);
+                    }
                 }
             } else if (obs.type === 'block') {
+                const py = oy + obs.y * sy;
                 gfx.fillStyle(blockColor, 1);
                 gfx.fillRect(px - bSize / 2, py - bSize / 2, bSize, bSize);
             }
