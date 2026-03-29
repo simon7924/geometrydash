@@ -9,21 +9,35 @@ const CAM_SPEED = 400; // px/s when scrolling
 
 // Obstacle palette entries
 const TOOLS = [
-    { id: 'spike',        label: '▲ Spike',          color: 0xff4444 },
-    { id: 'block',        label: '■ Block',           color: 0x4488ff },
-    { id: 'portal_CUBE',  label: '◆ Cube Portal',    color: 0x00ff88 },
-    { id: 'portal_SHIP',  label: '◆ Ship Portal',    color: 0x00ccff },
-    { id: 'portal_BALL',  label: '◆ Ball Portal',    color: 0xff88ff },
-    { id: 'portal_UFO',   label: '◆ UFO Portal',     color: 0xffff00 },
-    { id: 'portal_WAVE',  label: '◆ Wave Portal',    color: 0xff6600 },
-    { id: 'portal_SPIDER',label: '◆ Spider Portal',  color: 0xaa44ff },
-    { id: 'portal_ROBOT', label: '◆ Robot Portal',   color: 0xff4488 },
-    { id: 'erase',        label: '✕ Erase',           color: 0x444444 },
+    { id: 'spike',         label: '▲ Spike',          color: 0xff4444 },
+    { id: 'block',         label: '■ Block',           color: 0x4488ff },
+    { id: 'portal_CUBE',   label: '◆ Cube Portal',    color: 0x00ff88 },
+    { id: 'portal_SHIP',   label: '◆ Ship Portal',    color: 0x00ccff },
+    { id: 'portal_BALL',   label: '◆ Ball Portal',    color: 0xff88ff },
+    { id: 'portal_UFO',    label: '◆ UFO Portal',     color: 0xffff00 },
+    { id: 'portal_WAVE',   label: '◆ Wave Portal',    color: 0xff6600 },
+    { id: 'portal_SPIDER', label: '◆ Spider Portal',  color: 0xaa44ff },
+    { id: 'portal_ROBOT',  label: '◆ Robot Portal',   color: 0xff4488 },
+    { id: 'speed_HALF',    label: '» Slow (0.5x)',    color: 0x88aaff },
+    { id: 'speed_NORMAL',  label: '» Normal (1x)',    color: 0xaaffaa },
+    { id: 'speed_DOUBLE',  label: '» Fast (2x)',      color: 0xffff44 },
+    { id: 'speed_TRIPLE',  label: '» Faster (3x)',    color: 0xffaa00 },
+    { id: 'speed_QUADRUPLE',label: '» Fastest (4x)', color: 0xff4400 },
+    { id: 'erase',         label: '✕ Erase',           color: 0x444444 },
 ];
 
 const PORTAL_COLORS = {
     CUBE: 0x00ff88, SHIP: 0x00ccff, BALL: 0xff88ff,
     UFO: 0xffff00, WAVE: 0xff6600, SPIDER: 0xaa44ff, ROBOT: 0xff4488
+};
+
+const SPEED_COLORS = {
+    HALF: 0x88aaff, NORMAL: 0xaaffaa, DOUBLE: 0xffff44,
+    TRIPLE: 0xffaa00, QUADRUPLE: 0xff4400
+};
+
+const SPEED_LABELS = {
+    HALF: '0.5x', NORMAL: '1x', DOUBLE: '2x', TRIPLE: '3x', QUADRUPLE: '4x'
 };
 
 export class LevelEditorScene extends Phaser.Scene {
@@ -375,8 +389,12 @@ export class LevelEditorScene extends Phaser.Scene {
             this.ghost.fillRect(cx - GRID/2 + 2, cy - GRID/2 + 2, GRID - 4, GRID - 4);
         } else if (this.activeTool.startsWith('portal_')) {
             const mode = this.activeTool.replace('portal_', '');
-            this.ghost.fillStyle(PORTAL_COLORS[mode] || 0xffffff, 1);
+            this.ghost.fillStyle(PORTAL_COLORS[mode] || 0xffffff, 0.5);
             this.ghost.fillRect(cx - 16, CEILING_Y, 32, GROUND_Y - CEILING_Y);
+        } else if (this.activeTool.startsWith('speed_')) {
+            const speedMode = this.activeTool.replace('speed_', '');
+            this.ghost.fillStyle(SPEED_COLORS[speedMode] || 0xffffff, 0.5);
+            this.ghost.fillRect(cx - 12, CEILING_Y, 24, GROUND_Y - CEILING_Y);
         }
     }
 
@@ -457,10 +475,10 @@ export class LevelEditorScene extends Phaser.Scene {
         const prevTool = this.activeTool;
         if (forceTool) this.activeTool = forceTool;
 
-        // Only one portal per column (x position)
-        if (this.activeTool.startsWith('portal_')) {
+        // Only one portal/speed per column (x position)
+        if (this.activeTool.startsWith('portal_') || this.activeTool.startsWith('speed_')) {
             const existingPortal = this.placedObjects.find(
-                o => o.type.startsWith('portal_') && o.gx === gx
+                o => (o.type.startsWith('portal_') || o.type.startsWith('speed_')) && o.gx === gx
             );
             if (existingPortal) { this.activeTool = prevTool; return; }
         }
@@ -493,7 +511,19 @@ export class LevelEditorScene extends Phaser.Scene {
             const lbl = this.add.text(snapX, CEILING_Y + 20, mode, {
                 font: 'bold 11px Arial', fill: '#ffffff'
             }).setOrigin(0.5, 0).setDepth(16);
-            gameObj = [g, lbl]; // store both
+            gameObj = [g, lbl];
+        } else if (this.activeTool.startsWith('speed_')) {
+            const speedMode = this.activeTool.replace('speed_', '');
+            const color = SPEED_COLORS[speedMode] || 0xffffff;
+            const g = this.add.graphics().setDepth(15);
+            g.fillStyle(color, 0.4);
+            g.fillRect(snapX - 12, CEILING_Y, 24, GROUND_Y - CEILING_Y);
+            g.lineStyle(2, color, 1);
+            g.strokeRect(snapX - 12, CEILING_Y, 24, GROUND_Y - CEILING_Y);
+            const lbl = this.add.text(snapX, CEILING_Y + 20, SPEED_LABELS[speedMode], {
+                font: 'bold 11px Arial', fill: '#ffffff'
+            }).setOrigin(0.5, 0).setDepth(16);
+            gameObj = [g, lbl];
         }
 
         const rotation = (this.activeTool === 'spike') ? this.spikeRotation : 0;
@@ -503,9 +533,9 @@ export class LevelEditorScene extends Phaser.Scene {
     }
 
     _erase(gx, gy) {
-        // Portals: match by column only. Everything else: exact cell.
+        // Portals and speed portals: match by column only. Everything else: exact cell.
         const toRemove = this.placedObjects.filter(o => {
-            if (o.type.startsWith('portal_')) return o.gx === gx;
+            if (o.type.startsWith('portal_') || o.type.startsWith('speed_')) return o.gx === gx;
             return o.gx === gx && o.gy === gy;
         });
         toRemove.forEach(o => {
@@ -534,12 +564,20 @@ export class LevelEditorScene extends Phaser.Scene {
             const wy = CEILING_Y + o.gy * GRID + GRID / 2;
 
             if (o.type === 'spike') {
-                obstacles.push({ type: 'spike', x: wx, y: wy, rotation: o.rotation || 0 });
+                const rot = o.rotation || 0;
+                // Snap floor/ceiling spikes to exact game positions
+                let sy = wy;
+                if (rot === 0)   sy = GROUND_Y - 57;   // tip up, sits on floor
+                if (rot === 180) sy = CEILING_Y + 57;  // tip down, hangs from ceiling
+                obstacles.push({ type: 'spike', x: wx, y: sy, rotation: rot });
             } else if (o.type === 'block') {
                 obstacles.push({ type: 'block', x: wx, y: wy });
             } else if (o.type.startsWith('portal_')) {
                 const mode = o.type.replace('portal_', '');
                 portals.push({ type: 'gamemode', mode, x: wx, y: 360 });
+            } else if (o.type.startsWith('speed_')) {
+                const speedMode = o.type.replace('speed_', '');
+                portals.push({ type: 'speed', speedMode, x: wx, y: 360 });
             }
         });
 

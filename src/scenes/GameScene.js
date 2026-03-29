@@ -202,18 +202,46 @@ export class GameScene extends Phaser.Scene {
             });
         }
 
+        // Speed portals
+        this.speedPortals = this.physics.add.staticGroup();
+        this.speedPortalMap = new Map();
+        const speedColors = { HALF: 0x88aaff, NORMAL: 0xaaffaa, DOUBLE: 0xffff44, TRIPLE: 0xffaa00, QUADRUPLE: 0xff4400 };
+        const speedLabels = { HALF: '0.5x', NORMAL: '1x', DOUBLE: '2x', TRIPLE: '3x', QUADRUPLE: '4x' };
+        if (this.level?.portals) {
+            this.level.portals.filter(p => p.type === 'speed').forEach(portalData => {
+                const color = speedColors[portalData.speedMode] || 0xffffff;
+                for (let y = 100; y < 650; y += 50) {
+                    const sp = this.speedPortals.create(portalData.x, y, 'portal');
+                    sp.setTint(color).setAlpha(0.6);
+                    this.speedPortalMap.set(sp, portalData.speedMode);
+                }
+                this.add.text(portalData.x, 85, speedLabels[portalData.speedMode] || '', {
+                    font: 'bold 14px Arial',
+                    fill: '#' + color.toString(16).padStart(6, '0')
+                }).setOrigin(0.5);
+            });
+        }
+
         // Track which portals the player already passed through to avoid re-triggering
         this.passedPortals = new Set();
+
+        this.physics.add.overlap(this.player.sprite, this.speedPortals, (playerSprite, portalSprite) => {
+            const speedMode = this.speedPortalMap.get(portalSprite);
+            if (!speedMode) return;
+            const portalX = Math.round(portalSprite.x);
+            const key = 'speed_' + portalX;
+            if (this.passedPortals.has(key)) return;
+            this.passedPortals.add(key);
+            this.player.setSpeedMode(speedMode);
+        }, null, this);
 
         this.physics.add.overlap(this.player.sprite, this.gameModePortals, (playerSprite, portalSprite) => {
             const mode = this.portalModeMap.get(portalSprite);
             if (!mode) return;
 
             // Use portal X position as unique identifier
-            const portalX = portalSprite.x;
+            const portalX = 'mode_' + Math.round(portalSprite.x);
             if (this.passedPortals.has(portalX)) return;
-
-            // Mark this portal X as passed
             this.passedPortals.add(portalX);
 
             // Switch game mode
