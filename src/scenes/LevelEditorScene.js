@@ -205,13 +205,8 @@ export class LevelEditorScene extends Phaser.Scene {
         // Title
         const title = this.add.text(toolbarW / 2, 14, 'EDITOR', {
             font: 'bold 14px Arial', fill: '#00ffff'
-        }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(31);
+        }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(34);
         this._uiObjects.push(title);
-
-        // Mask rectangle to clip tool list (Phaser graphics mask)
-        const maskGfx = this.make.graphics({ add: false });
-        maskGfx.fillRect(0, listTop, toolbarW, listH);
-        const listMask = maskGfx.createGeometryMask();
 
         // Tool list scroll state
         this._toolScrollY = 0;
@@ -221,9 +216,8 @@ export class LevelEditorScene extends Phaser.Scene {
         const itemH = btnH + pad;
         const totalToolH = TOOLS.length * itemH;
 
-        // Container holds all tool buttons; we scroll it by changing y
+        // Container holds all tool buttons; scrolled by adjusting .y
         this._toolListContainer = this.add.container(0, listTop).setScrollFactor(0).setDepth(31);
-        this._toolListContainer.setMask(listMask);
 
         TOOLS.forEach((tool, i) => {
             const localY = i * itemH;
@@ -243,15 +237,27 @@ export class LevelEditorScene extends Phaser.Scene {
             btn.on('pointerout', () => {
                 if (this.activeTool !== tool.id) btn.setFillStyle(0x1a1a3e);
             });
-            btn.on('pointerdown', () => this._selectTool(tool.id));
+            btn.on('pointerdown', (p) => {
+                // Only activate if click is within the visible tool list area
+                if (p.y >= listTop && p.y <= listTop + listH) this._selectTool(tool.id);
+            });
 
             this._toolButtons[tool.id] = { btn, lbl };
             this._toolListContainer.add([btn, lbl]);
         });
 
+        // Cover strips to hide buttons outside the visible list area
+        // Top cover: hides buttons that scroll above the title
+        this.add.rectangle(toolbarW / 2, listTop / 2, toolbarW, listTop, 0x0d0d1e)
+            .setScrollFactor(0).setDepth(33);
+        // Bottom cover: hides buttons that overflow below the list into the buttons area
+        const coverTop = listTop + listH;
+        const coverH = H - coverTop;
+        this.add.rectangle(toolbarW / 2, coverTop + coverH / 2, toolbarW, coverH, 0x0d0d1e)
+            .setScrollFactor(0).setDepth(33);
+
         // Scroll the tool list when mouse wheel is over toolbar
         this._toolScrollHandler = (e) => {
-            // Only scroll if pointer is in toolbar area
             if (e.offsetX > toolbarW) return;
             const maxScroll = Math.max(0, totalToolH - listH);
             this._toolScrollY = Phaser.Math.Clamp(this._toolScrollY + e.deltaY * 0.5, 0, maxScroll);
@@ -261,15 +267,15 @@ export class LevelEditorScene extends Phaser.Scene {
 
         // Separator
         const sep = this.add.rectangle(toolbarW / 2, H - BOTTOM_H + 5, toolbarW - 12, 1, 0x3a3a5e)
-            .setScrollFactor(0).setDepth(31);
+            .setScrollFactor(0).setDepth(34);
         this._uiObjects.push(sep);
 
         // Save button
         const saveBtn = this.add.rectangle(toolbarW / 2, H - 185, toolbarW - 12, 36, 0x006633)
-            .setScrollFactor(0).setDepth(31).setInteractive({ useHandCursor: true });
+            .setScrollFactor(0).setDepth(34).setInteractive({ useHandCursor: true });
         const saveLbl = this.add.text(toolbarW / 2, H - 185, 'PUBLISH', {
             font: 'bold 13px Arial', fill: '#ffffff'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(32);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(35);
         saveBtn.on('pointerover', () => saveBtn.setFillStyle(0x008844));
         saveBtn.on('pointerout', () => saveBtn.setFillStyle(0x006633));
         saveBtn.on('pointerdown', () => this._save());
@@ -277,10 +283,10 @@ export class LevelEditorScene extends Phaser.Scene {
 
         // Test play button
         const testBtn = this.add.rectangle(toolbarW / 2, H - 140, toolbarW - 12, 36, 0x004488)
-            .setScrollFactor(0).setDepth(31).setInteractive({ useHandCursor: true });
+            .setScrollFactor(0).setDepth(34).setInteractive({ useHandCursor: true });
         const testLbl = this.add.text(toolbarW / 2, H - 140, 'TEST PLAY', {
             font: 'bold 13px Arial', fill: '#ffffff'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(32);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(35);
         testBtn.on('pointerover', () => testBtn.setFillStyle(0x0066aa));
         testBtn.on('pointerout', () => testBtn.setFillStyle(0x004488));
         testBtn.on('pointerdown', () => this._testPlay());
@@ -288,10 +294,10 @@ export class LevelEditorScene extends Phaser.Scene {
 
         // Clear button
         const clearBtn = this.add.rectangle(toolbarW / 2, H - 95, toolbarW - 12, 36, 0x550000)
-            .setScrollFactor(0).setDepth(31).setInteractive({ useHandCursor: true });
+            .setScrollFactor(0).setDepth(34).setInteractive({ useHandCursor: true });
         const clearLbl = this.add.text(toolbarW / 2, H - 95, 'CLEAR ALL', {
             font: 'bold 13px Arial', fill: '#ffffff'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(32);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(35);
         clearBtn.on('pointerover', () => clearBtn.setFillStyle(0x880000));
         clearBtn.on('pointerout', () => clearBtn.setFillStyle(0x550000));
         clearBtn.on('pointerdown', () => this._clearAll());
@@ -299,10 +305,10 @@ export class LevelEditorScene extends Phaser.Scene {
 
         // Back button
         const backBtn = this.add.rectangle(toolbarW / 2, H - 48, toolbarW - 12, 36, 0x2a2a4e)
-            .setScrollFactor(0).setDepth(31).setInteractive({ useHandCursor: true });
+            .setScrollFactor(0).setDepth(34).setInteractive({ useHandCursor: true });
         const backLbl = this.add.text(toolbarW / 2, H - 48, '< BACK', {
             font: 'bold 13px Arial', fill: '#aaaaaa'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(32);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(35);
         backBtn.on('pointerover', () => backBtn.setFillStyle(0x3a3a6e));
         backBtn.on('pointerout', () => backBtn.setFillStyle(0x2a2a4e));
         backBtn.on('pointerdown', () => this._goBack());
@@ -311,7 +317,7 @@ export class LevelEditorScene extends Phaser.Scene {
         // Status text
         this._statusText = this.add.text(toolbarW / 2, H - 10, '', {
             font: '10px Arial', fill: '#888888'
-        }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(32);
+        }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(35);
         this._uiObjects.push(this._statusText);
 
         // Ignore tool list container in world cam (after worldCam is set)
