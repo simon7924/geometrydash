@@ -277,17 +277,17 @@ export class LevelEditorScene extends Phaser.Scene {
             innerDiv.appendChild(btn);
         });
 
-        // Scroll inner div on wheel over toolbar
+        // Scroll inner div on wheel over the tool list div
         this._toolScrollHandler = (e) => {
-            if (e.offsetX > toolbarW) return;
             e.preventDefault();
+            e.stopPropagation();
             const totalToolH = TOOLS.length * (btnH + pad);
             const maxScroll = Math.max(0, totalToolH - listH / scaleY);
             const currentTop = parseFloat(innerDiv.style.top) || 0;
             const newTop = Math.max(-maxScroll, Math.min(0, currentTop - e.deltaY * 0.5 / scaleY));
             innerDiv.style.top = newTop + 'px';
         };
-        this.game.canvas.addEventListener('wheel', this._toolScrollHandler);
+        toolListDiv.addEventListener('wheel', this._toolScrollHandler, { passive: false });
 
         // Separator
         const sep = this.add.rectangle(toolbarW / 2, H - BOTTOM_H + 5, toolbarW - 12, 1, 0x3a3a5e)
@@ -775,8 +775,8 @@ export class LevelEditorScene extends Phaser.Scene {
             this.game.canvas.removeEventListener('wheel', this._wheelHandler);
             this._wheelHandler = null;
         }
-        if (this._toolScrollHandler) {
-            this.game.canvas.removeEventListener('wheel', this._toolScrollHandler);
+        if (this._toolScrollHandler && this._toolListDiv) {
+            this._toolListDiv.removeEventListener('wheel', this._toolScrollHandler);
             this._toolScrollHandler = null;
         }
     }
