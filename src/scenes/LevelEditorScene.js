@@ -193,7 +193,6 @@ export class LevelEditorScene extends Phaser.Scene {
 
         // Bottom buttons area height
         const BOTTOM_H = 220;
-        // Tool list area: from title to just above bottom buttons
         const listTop = 42;
         const listH = H - BOTTOM_H - listTop;
 
@@ -208,60 +207,85 @@ export class LevelEditorScene extends Phaser.Scene {
         }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(34);
         this._uiObjects.push(title);
 
-        // Tool list scroll state
-        this._toolScrollY = 0;
+        // DOM-based scrollable tool list — reliable clipping without Phaser container issues
         this._toolButtons = {};
-        const btnH = 34;
-        const pad = 3;
-        const itemH = btnH + pad;
-        const totalToolH = TOOLS.length * itemH;
+        const gameContainer = document.getElementById('game-container');
+        const canvasRect = this.game.canvas.getBoundingClientRect();
+        const scaleX = this.game.canvas.width / canvasRect.width;
+        const scaleY = this.game.canvas.height / canvasRect.height;
 
-        // Container holds all tool buttons; scrolled by adjusting .y
-        this._toolListContainer = this.add.container(0, listTop).setScrollFactor(0).setDepth(31);
+        const toolListDiv = document.createElement('div');
+        toolListDiv.style.cssText = `
+            position: absolute;
+            left: 0px;
+            top: ${listTop / scaleY}px;
+            width: ${toolbarW / scaleX}px;
+            height: ${listH / scaleY}px;
+            overflow: hidden;
+            z-index: 50;
+            pointer-events: auto;
+        `;
+        gameContainer.appendChild(toolListDiv);
+        this._toolListDiv = toolListDiv;
+
+        const innerDiv = document.createElement('div');
+        innerDiv.style.cssText = `
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            width: 100%;
+        `;
+        toolListDiv.appendChild(innerDiv);
+        this._toolListInner = innerDiv;
+
+        const btnH = 34 / scaleY;
+        const pad = 3 / scaleY;
 
         TOOLS.forEach((tool, i) => {
-            const localY = i * itemH;
             const isActive = tool.id === this.activeTool;
-
-            const btn = this.add.rectangle(toolbarW / 2, localY + btnH / 2, toolbarW - 12, btnH,
-                isActive ? 0x2a2a6e : 0x1a1a3e)
-                .setScrollFactor(0).setInteractive({ useHandCursor: true });
-
-            const lbl = this.add.text(toolbarW / 2, localY + btnH / 2, tool.label, {
-                font: '11px Arial', fill: isActive ? '#ffffff' : '#aaaaaa'
-            }).setOrigin(0.5).setScrollFactor(0);
-
-            btn.on('pointerover', () => {
-                if (this.activeTool !== tool.id) btn.setFillStyle(0x2a2a4e);
+            const btn = document.createElement('button');
+            btn.textContent = tool.label;
+            btn.dataset.toolId = tool.id;
+            btn.style.cssText = `
+                display: block;
+                width: calc(100% - 8px);
+                margin: ${pad}px 4px 0 4px;
+                height: ${btnH}px;
+                background: ${isActive ? '#2a2a6e' : '#1a1a3e'};
+                color: ${isActive ? '#ffffff' : '#aaaaaa'};
+                border: 1px solid #3a3a6e;
+                border-radius: 3px;
+                font: 11px Arial;
+                cursor: pointer;
+                text-align: center;
+                padding: 0 4px;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            `;
+            btn.addEventListener('mouseover', () => {
+                if (this.activeTool !== tool.id) btn.style.background = '#2a2a4e';
             });
-            btn.on('pointerout', () => {
-                if (this.activeTool !== tool.id) btn.setFillStyle(0x1a1a3e);
+            btn.addEventListener('mouseout', () => {
+                if (this.activeTool !== tool.id) btn.style.background = '#1a1a3e';
             });
-            btn.on('pointerdown', (p) => {
-                // Only activate if click is within the visible tool list area
-                if (p.y >= listTop && p.y <= listTop + listH) this._selectTool(tool.id);
+            btn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                this._selectTool(tool.id);
             });
-
-            this._toolButtons[tool.id] = { btn, lbl };
-            this._toolListContainer.add([btn, lbl]);
+            this._toolButtons[tool.id] = btn;
+            innerDiv.appendChild(btn);
         });
 
-        // Cover strips to hide buttons outside the visible list area
-        // Top cover: hides buttons that scroll above the title
-        this.add.rectangle(toolbarW / 2, listTop / 2, toolbarW, listTop, 0x0d0d1e)
-            .setScrollFactor(0).setDepth(33);
-        // Bottom cover: hides buttons that overflow below the list into the buttons area
-        const coverTop = listTop + listH;
-        const coverH = H - coverTop;
-        this.add.rectangle(toolbarW / 2, coverTop + coverH / 2, toolbarW, coverH, 0x0d0d1e)
-            .setScrollFactor(0).setDepth(33);
-
-        // Scroll the tool list when mouse wheel is over toolbar
+        // Scroll inner div on wheel over toolbar
         this._toolScrollHandler = (e) => {
             if (e.offsetX > toolbarW) return;
-            const maxScroll = Math.max(0, totalToolH - listH);
-            this._toolScrollY = Phaser.Math.Clamp(this._toolScrollY + e.deltaY * 0.5, 0, maxScroll);
-            this._toolListContainer.y = listTop - this._toolScrollY;
+            e.preventDefault();
+            const totalToolH = TOOLS.length * (btnH + pad);
+            const maxScroll = Math.max(0, totalToolH - listH / scaleY);
+            const currentTop = parseFloat(innerDiv.style.top) || 0;
+            const newTop = Math.max(-maxScroll, Math.min(0, currentTop - e.deltaY * 0.5 / scaleY));
+            innerDiv.style.top = newTop + 'px';
         };
         this.game.canvas.addEventListener('wheel', this._toolScrollHandler);
 
@@ -320,8 +344,6 @@ export class LevelEditorScene extends Phaser.Scene {
         }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(35);
         this._uiObjects.push(this._statusText);
 
-        // Ignore tool list container in world cam (after worldCam is set)
-        this.worldCam?.ignore(this._toolListContainer);
     }
 
     _buildNameInput(W, toolbarW) {
@@ -394,14 +416,14 @@ export class LevelEditorScene extends Phaser.Scene {
     _selectTool(toolId) {
         const prev = this._toolButtons[this.activeTool];
         if (prev) {
-            prev.btn.setFillStyle(0x1a1a3e);
-            prev.lbl.setStyle({ fill: '#aaaaaa' });
+            prev.style.background = '#1a1a3e';
+            prev.style.color = '#aaaaaa';
         }
         this.activeTool = toolId;
         const cur = this._toolButtons[toolId];
         if (cur) {
-            cur.btn.setFillStyle(0x2a2a6e);
-            cur.lbl.setStyle({ fill: '#ffffff' });
+            cur.style.background = '#2a2a6e';
+            cur.style.color = '#ffffff';
         }
     }
 
@@ -746,7 +768,7 @@ export class LevelEditorScene extends Phaser.Scene {
     }
 
     _cleanup() {
-        [this._inputEl, this._lenEl, this._lenLabelEl].forEach(el => {
+        [this._inputEl, this._lenEl, this._lenLabelEl, this._toolListDiv].forEach(el => {
             if (el && el.parentNode) el.parentNode.removeChild(el);
         });
         if (this._wheelHandler) {
