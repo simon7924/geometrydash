@@ -14,14 +14,88 @@ export class LevelSelectScene extends Phaser.Scene {
         // Start at index 1 (level 1) — index 0 is Endless (to the left)
         this.currentIndex = 1;
         this.levelCards = [];
+        this._bgTextures = []; // RenderTextures for each level background
+    }
+
+    // Draw an accurate mini-preview of the first ~1280px of the level into a RenderTexture.
+    // scaleX/scaleY map level world coords to the texture dimensions.
+    _buildLevelSnapshot(level, rtW, rtH) {
+        const WORLD_W = 1280; // how many world px we preview
+        const WORLD_H = 720;
+        const GROUND_Y = 650;
+        const CEILING_Y = 70;
+        const sx = rtW / WORLD_W;
+        const sy = rtH / WORLD_H;
+
+        const rt = this.add.renderTexture(0, 0, rtW, rtH);
+
+        // Background fill
+        const bgGfx = this.make.graphics({ add: false });
+        bgGfx.fillStyle(level.backgroundColor || 0x1a1a2e, 1);
+        bgGfx.fillRect(0, 0, rtW, rtH);
+        rt.draw(bgGfx, 0, 0);
+        bgGfx.destroy();
+
+        // Ground slab
+        const groundGfx = this.make.graphics({ add: false });
+        groundGfx.fillStyle(level.groundColor || 0x2a2a4e, 1);
+        groundGfx.fillRect(0, GROUND_Y * sy, rtW, rtH - GROUND_Y * sy);
+        // Ceiling slab
+        groundGfx.fillRect(0, 0, rtW, CEILING_Y * sy);
+        rt.draw(groundGfx, 0, 0);
+        groundGfx.destroy();
+
+        // Obstacles — draw only those in first WORLD_W px
+        const obsGfx = this.make.graphics({ add: false });
+        const spikeColor = level.spikeColor || 0xff4444;
+        const blockColor = 0x6a4a8a;
+
+        level.obstacles.forEach(obs => {
+            if (obs.x > WORLD_W) return;
+            const ox = obs.x * sx;
+            const oy = obs.y * sy;
+
+            if (obs.type === 'spike') {
+                obsGfx.fillStyle(spikeColor, 1);
+                const hw = 12 * sx, hh = 14 * sy;
+                if (obs.flipY) {
+                    obsGfx.fillTriangle(ox, oy - hh, ox - hw, oy + hh, ox + hw, oy + hh);
+                } else {
+                    obsGfx.fillTriangle(ox, oy + hh, ox - hw, oy - hh, ox + hw, oy - hh);
+                }
+            } else if (obs.type === 'block') {
+                obsGfx.fillStyle(blockColor, 1);
+                const bw = 24 * sx, bh = 24 * sy;
+                obsGfx.fillRect(ox - bw / 2, oy - bh / 2, bw, bh);
+            }
+        });
+        rt.draw(obsGfx, 0, 0);
+        obsGfx.destroy();
+
+        return rt;
     }
 
     create() {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
 
-        // Background
-        this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
+        // Pre-generate all level data for backgrounds + thumbnails
+        this._generatedLevels = LEVELS.map(ld => this.levelGenerator.generateLevel(ld.difficulty, ld.seed));
+
+        // Full-screen background image (level preview, blurred via dark overlay)
+        this._bgImage = this.add.image(width / 2, height / 2, '__missing').setVisible(false);
+        this._bgOverlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55)
+            .setDepth(1);
+
+        // Fallback solid bg (for endless and before first render)
+        this._fallbackBg = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e).setDepth(0);
+
+        // Build background RenderTextures for each level (not endless)
+        this._bgTextures = this._generatedLevels.map((level, i) => {
+            const rt = this._buildLevelSnapshot(level, width, height);
+            rt.setVisible(false).setDepth(0).setScrollFactor(0);
+            return rt;
+        });
 
         // Title
         this.add.text(width / 2, 50, 'SELECT LEVEL', {
@@ -29,7 +103,7 @@ export class LevelSelectScene extends Phaser.Scene {
             fill: '#00ffff',
             stroke: '#ffffff',
             strokeThickness: 2
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(3);
 
         // Back button
         const backButton = this.add.text(80, 50, '< BACK', {
@@ -37,7 +111,7 @@ export class LevelSelectScene extends Phaser.Scene {
             fill: '#ffffff',
             backgroundColor: '#2a2a4e',
             padding: { x: 15, y: 10 }
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(3);
 
         backButton.on('pointerover', () => backButton.setStyle({ fill: '#00ffff' }));
         backButton.on('pointerout', () => backButton.setStyle({ fill: '#ffffff' }));
@@ -45,8 +119,8 @@ export class LevelSelectScene extends Phaser.Scene {
             this.scene.start('MenuScene', { user: this.user, profile: this.profile, isGuest: this.isGuest });
         });
 
-        // Create level cards container
-        this.cardsContainer = this.add.container(0, 0);
+        // Create level cards container (depth above backgrounds)
+        this.cardsContainer = this.add.container(0, 0).setDepth(2);
 
         // Generate level cards
         this.createLevelCards();
@@ -58,7 +132,7 @@ export class LevelSelectScene extends Phaser.Scene {
         this.add.text(width / 2, height - 30, 'Use arrow keys or click arrows to navigate', {
             font: '16px Arial',
             fill: '#666666'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(3);
 
         // Keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -71,6 +145,34 @@ export class LevelSelectScene extends Phaser.Scene {
 
         // Initial position
         this.updateCardPositions(false);
+
+        // Show correct background for starting level
+        this._updateBackground(false);
+    }
+
+    _updateBackground(animate) {
+        const levelIndex = this.currentIndex - 1; // 0-based into _bgTextures; -1 = endless
+
+        // Hide all bg textures
+        this._bgTextures.forEach(rt => rt.setVisible(false));
+
+        if (levelIndex < 0 || levelIndex >= this._bgTextures.length) {
+            // Endless — just show fallback dark bg
+            this._fallbackBg.setVisible(true);
+            this._bgOverlay.setAlpha(0);
+            return;
+        }
+
+        this._fallbackBg.setVisible(false);
+        const rt = this._bgTextures[levelIndex];
+        rt.setVisible(true);
+        if (animate) {
+            rt.setAlpha(0);
+            this.tweens.add({ targets: rt, alpha: 1, duration: 250 });
+        } else {
+            rt.setAlpha(1);
+        }
+        this._bgOverlay.setAlpha(0.55);
     }
 
     createLevelCards() {
@@ -78,13 +180,14 @@ export class LevelSelectScene extends Phaser.Scene {
         const height = this.cameras.main.height;
         const cardWidth = 300;
         const cardHeight = 400;
+        const thumbW = cardWidth - 40;
+        const thumbH = 120;
 
         // --- Endless card at index 0 ---
         this._createEndlessCard(cardWidth, cardHeight, height);
 
         // --- Normal level cards at indices 1–8 ---
-        LEVELS.forEach((levelData, index) => {
-            const level = this.levelGenerator.generateLevel(levelData.difficulty, levelData.seed);
+        this._generatedLevels.forEach((level, index) => {
             const cardIndex = index + 1; // shift by 1 to make room for endless
 
             // Card container
@@ -95,10 +198,14 @@ export class LevelSelectScene extends Phaser.Scene {
                 .setStrokeStyle(4, 0x4a4a6a);
             card.add(bg);
 
-            // Level preview (mini visualization)
-            const preview = this.createLevelPreview(level, cardWidth - 40, 120);
-            preview.setPosition(0, -100);
-            card.add(preview);
+            // Accurate thumbnail — render into a small RenderTexture
+            const thumbRT = this._buildLevelSnapshot(level, thumbW, thumbH);
+            thumbRT.setPosition(-thumbW / 2, -cardHeight / 2 + 10);
+            // Add a border around thumbnail
+            const thumbBorder = this.add.rectangle(0, -cardHeight / 2 + 10 + thumbH / 2, thumbW + 4, thumbH + 4, 0x000000, 0)
+                .setStrokeStyle(2, 0x4a4a6a);
+            card.add(thumbBorder);
+            card.add(thumbRT);
 
             // Level name
             const nameText = this.add.text(0, 20, level.name, {
@@ -204,39 +311,6 @@ export class LevelSelectScene extends Phaser.Scene {
         this.cardsContainer.add(card);
     }
 
-    createLevelPreview(level, previewWidth, previewHeight) {
-        const container = this.add.container(0, 0);
-
-        // Preview background
-        const previewBg = this.add.rectangle(0, 0, previewWidth, previewHeight, 0x0a0a1a)
-            .setStrokeStyle(2, 0x3a3a5a);
-        container.add(previewBg);
-
-        // Ground line
-        const groundLine = this.add.rectangle(0, previewHeight / 2 - 10, previewWidth - 10, 4, level.groundColor);
-        container.add(groundLine);
-
-        // Sample obstacles (scaled down)
-        const scale = previewWidth / level.levelLength;
-        const maxObstacles = 15;
-        const step = Math.max(1, Math.floor(level.obstacles.length / maxObstacles));
-
-        for (let i = 0; i < level.obstacles.length && i < maxObstacles * step; i += step) {
-            const obs = level.obstacles[i];
-            const x = (obs.x * scale) - previewWidth / 2 + 20;
-            const y = previewHeight / 2 - 20;
-
-            if (obs.type === 'spike') {
-                const spike = this.add.triangle(x, y, 0, 8, 4, 0, 8, 8, level.spikeColor);
-                container.add(spike);
-            } else if (obs.type === 'block') {
-                const block = this.add.rectangle(x, y - 4, 8, 8, 0x6a4a8a);
-                container.add(block);
-            }
-        }
-
-        return container;
-    }
 
     getDifficultyColor(difficulty) {
         const colors = {
@@ -257,7 +331,7 @@ export class LevelSelectScene extends Phaser.Scene {
         this.leftArrow = this.add.text(50, height / 2 + 20, '◀', {
             font: 'bold 60px Arial',
             fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(3);
 
         this.leftArrow.on('pointerover', () => this.leftArrow.setStyle({ fill: '#00ffff' }));
         this.leftArrow.on('pointerout', () => this.leftArrow.setStyle({ fill: '#ffffff' }));
@@ -267,14 +341,14 @@ export class LevelSelectScene extends Phaser.Scene {
         this.rightArrow = this.add.text(width - 50, height / 2 + 20, '▶', {
             font: 'bold 60px Arial',
             fill: '#ffffff'
-        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(3);
 
         this.rightArrow.on('pointerover', () => this.rightArrow.setStyle({ fill: '#00ffff' }));
         this.rightArrow.on('pointerout', () => this.rightArrow.setStyle({ fill: '#ffffff' }));
         this.rightArrow.on('pointerdown', () => this.navigateRight());
 
         // Level indicator dots
-        this.dotsContainer = this.add.container(width / 2, height - 70);
+        this.dotsContainer = this.add.container(width / 2, height - 70).setDepth(3);
         this.updateDots();
     }
 
@@ -305,14 +379,16 @@ export class LevelSelectScene extends Phaser.Scene {
             this.currentIndex--;
             this.updateCardPositions(true);
             this.updateDots();
+            this._updateBackground(true);
         }
     }
 
     navigateRight() {
-        if (this.currentIndex < LEVELS.length) { // LEVELS.length = 8, max index = 8 (9 cards)
+        if (this.currentIndex < LEVELS.length) {
             this.currentIndex++;
             this.updateCardPositions(true);
             this.updateDots();
+            this._updateBackground(true);
         }
     }
 
