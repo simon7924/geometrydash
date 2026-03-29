@@ -14,18 +14,21 @@ export class LevelSelectScene extends Phaser.Scene {
         // Start at index 1 (level 1) — index 0 is Endless (to the left)
         this.currentIndex = 1;
         this.levelCards = [];
-        this._bgTextures = []; // RenderTextures for each level background
     }
 
-    // Draw an accurate preview of the first WORLD_W px of the level into a Graphics object.
-    // ox/oy = top-left corner in local space (for use inside a container).
+    // Draw an accurate thumbnail preview into a Graphics object.
+    // ox/oy = top-left corner in local space. Draws the first WORLD_W px of the level.
     _drawLevelPreview(gfx, level, ox, oy, drawW, drawH) {
         const WORLD_W = 1280;
+        const GROUND_Y = 650;  // world Y of ground surface
+        const CEILING_Y = 70;  // world Y of ceiling surface
         const WORLD_H = 720;
-        const GROUND_Y = 650;
-        const CEILING_Y = 70;
         const sx = drawW / WORLD_W;
         const sy = drawH / WORLD_H;
+
+        // Ground slab — where ground starts in preview
+        const groundLineY = oy + GROUND_Y * sy;
+        const ceilLineY   = oy + CEILING_Y * sy;
 
         // Background
         gfx.fillStyle(level.backgroundColor || 0x1a1a2e, 1);
@@ -33,13 +36,18 @@ export class LevelSelectScene extends Phaser.Scene {
 
         // Ceiling slab
         gfx.fillStyle(level.groundColor || 0x2a2a4e, 1);
-        gfx.fillRect(ox, oy, drawW, CEILING_Y * sy);
+        gfx.fillRect(ox, oy, drawW, ceilLineY - oy);
         // Ground slab
-        gfx.fillRect(ox, oy + GROUND_Y * sy, drawW, drawH - GROUND_Y * sy);
+        gfx.fillRect(ox, groundLineY, drawW, oy + drawH - groundLineY);
 
         // Obstacles in first WORLD_W px
         const spikeColor = level.spikeColor || 0xff4444;
         const blockColor = 0x6a4a8a;
+        // spike size relative to preview
+        const hw = Math.max(3, 9 * sx);
+        const hh = Math.max(4, 11 * sy);
+        const bSize = Math.max(4, 18 * sx);
+
         level.obstacles.forEach(obs => {
             if (obs.x > WORLD_W || obs.x < 0) return;
             const px = ox + obs.x * sx;
@@ -47,18 +55,16 @@ export class LevelSelectScene extends Phaser.Scene {
 
             if (obs.type === 'spike') {
                 gfx.fillStyle(spikeColor, 1);
-                const hw = 10 * sx, hh = 12 * sy;
                 if (obs.flipY) {
-                    // Points down
+                    // Ceiling spike: base at top (py - hh), tip points down (py + hh)
                     gfx.fillTriangle(px, py + hh, px - hw, py - hh, px + hw, py - hh);
                 } else {
-                    // Points up
+                    // Floor spike: base at bottom (py + hh), tip points up (py - hh)
                     gfx.fillTriangle(px, py - hh, px - hw, py + hh, px + hw, py + hh);
                 }
             } else if (obs.type === 'block') {
                 gfx.fillStyle(blockColor, 1);
-                const bw = 22 * sx, bh = 22 * sy;
-                gfx.fillRect(px - bw / 2, py - bh / 2, bw, bh);
+                gfx.fillRect(px - bSize / 2, py - bSize / 2, bSize, bSize);
             }
         });
     }
@@ -67,26 +73,11 @@ export class LevelSelectScene extends Phaser.Scene {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
 
-        // Pre-generate all level data for backgrounds + thumbnails
+        // Pre-generate all level data for thumbnails
         this._generatedLevels = LEVELS.map(ld => this.levelGenerator.generateLevel(ld.difficulty, ld.seed));
 
-        // Dark overlay sits above the bg snapshots to create the blurred/dimmed look
-        this._bgOverlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55)
-            .setDepth(1);
-
-        // Fallback solid bg (for endless and before first render)
-        this._fallbackBg = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e).setDepth(0);
-
-        // Build background snapshots for each level using Graphics drawn into RenderTexture
-        this._bgTextures = this._generatedLevels.map((level) => {
-            const gfx = this.make.graphics({ add: false });
-            this._drawLevelPreview(gfx, level, 0, 0, width, height);
-            const rt = this.add.renderTexture(0, 0, width, height);
-            rt.draw(gfx, 0, 0);
-            gfx.destroy();
-            rt.setVisible(false).setDepth(0).setOrigin(0, 0);
-            return rt;
-        });
+        // Solid color background — color changes per level
+        this._bg = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e).setDepth(0);
 
         // Title
         this.add.text(width / 2, 50, 'SELECT LEVEL', {
@@ -142,28 +133,10 @@ export class LevelSelectScene extends Phaser.Scene {
     }
 
     _updateBackground(animate) {
-        const levelIndex = this.currentIndex - 1; // 0-based into _bgTextures; -1 = endless
-
-        // Hide all bg textures
-        this._bgTextures.forEach(rt => rt.setVisible(false));
-
-        if (levelIndex < 0 || levelIndex >= this._bgTextures.length) {
-            // Endless — just show fallback dark bg
-            this._fallbackBg.setVisible(true);
-            this._bgOverlay.setAlpha(0);
-            return;
-        }
-
-        this._fallbackBg.setVisible(false);
-        const rt = this._bgTextures[levelIndex];
-        rt.setVisible(true);
-        if (animate) {
-            rt.setAlpha(0);
-            this.tweens.add({ targets: rt, alpha: 1, duration: 250 });
-        } else {
-            rt.setAlpha(1);
-        }
-        this._bgOverlay.setAlpha(0.55);
+        const levelIndex = this.currentIndex - 1; // -1 = endless
+        const level = this._generatedLevels[levelIndex];
+        const color = level ? level.backgroundColor : 0x1a1a2e;
+        this._bg.setFillStyle(color);
     }
 
     createLevelCards() {
