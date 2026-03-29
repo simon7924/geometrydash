@@ -17,62 +17,50 @@ export class LevelSelectScene extends Phaser.Scene {
         this._bgTextures = []; // RenderTextures for each level background
     }
 
-    // Draw an accurate mini-preview of the first ~1280px of the level into a RenderTexture.
-    // scaleX/scaleY map level world coords to the texture dimensions.
-    _buildLevelSnapshot(level, rtW, rtH) {
-        const WORLD_W = 1280; // how many world px we preview
+    // Draw an accurate preview of the first WORLD_W px of the level into a Graphics object.
+    // ox/oy = top-left corner in local space (for use inside a container).
+    _drawLevelPreview(gfx, level, ox, oy, drawW, drawH) {
+        const WORLD_W = 1280;
         const WORLD_H = 720;
         const GROUND_Y = 650;
         const CEILING_Y = 70;
-        const sx = rtW / WORLD_W;
-        const sy = rtH / WORLD_H;
+        const sx = drawW / WORLD_W;
+        const sy = drawH / WORLD_H;
 
-        const rt = this.add.renderTexture(0, 0, rtW, rtH);
+        // Background
+        gfx.fillStyle(level.backgroundColor || 0x1a1a2e, 1);
+        gfx.fillRect(ox, oy, drawW, drawH);
 
-        // Background fill
-        const bgGfx = this.make.graphics({ add: false });
-        bgGfx.fillStyle(level.backgroundColor || 0x1a1a2e, 1);
-        bgGfx.fillRect(0, 0, rtW, rtH);
-        rt.draw(bgGfx, 0, 0);
-        bgGfx.destroy();
-
-        // Ground slab
-        const groundGfx = this.make.graphics({ add: false });
-        groundGfx.fillStyle(level.groundColor || 0x2a2a4e, 1);
-        groundGfx.fillRect(0, GROUND_Y * sy, rtW, rtH - GROUND_Y * sy);
         // Ceiling slab
-        groundGfx.fillRect(0, 0, rtW, CEILING_Y * sy);
-        rt.draw(groundGfx, 0, 0);
-        groundGfx.destroy();
+        gfx.fillStyle(level.groundColor || 0x2a2a4e, 1);
+        gfx.fillRect(ox, oy, drawW, CEILING_Y * sy);
+        // Ground slab
+        gfx.fillRect(ox, oy + GROUND_Y * sy, drawW, drawH - GROUND_Y * sy);
 
-        // Obstacles — draw only those in first WORLD_W px
-        const obsGfx = this.make.graphics({ add: false });
+        // Obstacles in first WORLD_W px
         const spikeColor = level.spikeColor || 0xff4444;
         const blockColor = 0x6a4a8a;
-
         level.obstacles.forEach(obs => {
-            if (obs.x > WORLD_W) return;
-            const ox = obs.x * sx;
-            const oy = obs.y * sy;
+            if (obs.x > WORLD_W || obs.x < 0) return;
+            const px = ox + obs.x * sx;
+            const py = oy + obs.y * sy;
 
             if (obs.type === 'spike') {
-                obsGfx.fillStyle(spikeColor, 1);
-                const hw = 12 * sx, hh = 14 * sy;
+                gfx.fillStyle(spikeColor, 1);
+                const hw = 10 * sx, hh = 12 * sy;
                 if (obs.flipY) {
-                    obsGfx.fillTriangle(ox, oy - hh, ox - hw, oy + hh, ox + hw, oy + hh);
+                    // Points down
+                    gfx.fillTriangle(px, py + hh, px - hw, py - hh, px + hw, py - hh);
                 } else {
-                    obsGfx.fillTriangle(ox, oy + hh, ox - hw, oy - hh, ox + hw, oy - hh);
+                    // Points up
+                    gfx.fillTriangle(px, py - hh, px - hw, py + hh, px + hw, py + hh);
                 }
             } else if (obs.type === 'block') {
-                obsGfx.fillStyle(blockColor, 1);
-                const bw = 24 * sx, bh = 24 * sy;
-                obsGfx.fillRect(ox - bw / 2, oy - bh / 2, bw, bh);
+                gfx.fillStyle(blockColor, 1);
+                const bw = 22 * sx, bh = 22 * sy;
+                gfx.fillRect(px - bw / 2, py - bh / 2, bw, bh);
             }
         });
-        rt.draw(obsGfx, 0, 0);
-        obsGfx.destroy();
-
-        return rt;
     }
 
     create() {
@@ -82,18 +70,21 @@ export class LevelSelectScene extends Phaser.Scene {
         // Pre-generate all level data for backgrounds + thumbnails
         this._generatedLevels = LEVELS.map(ld => this.levelGenerator.generateLevel(ld.difficulty, ld.seed));
 
-        // Full-screen background image (level preview, blurred via dark overlay)
-        this._bgImage = this.add.image(width / 2, height / 2, '__missing').setVisible(false);
+        // Dark overlay sits above the bg snapshots to create the blurred/dimmed look
         this._bgOverlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.55)
             .setDepth(1);
 
         // Fallback solid bg (for endless and before first render)
         this._fallbackBg = this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e).setDepth(0);
 
-        // Build background RenderTextures for each level (not endless)
-        this._bgTextures = this._generatedLevels.map((level, i) => {
-            const rt = this._buildLevelSnapshot(level, width, height);
-            rt.setVisible(false).setDepth(0).setScrollFactor(0);
+        // Build background snapshots for each level using Graphics drawn into RenderTexture
+        this._bgTextures = this._generatedLevels.map((level) => {
+            const gfx = this.make.graphics({ add: false });
+            this._drawLevelPreview(gfx, level, 0, 0, width, height);
+            const rt = this.add.renderTexture(0, 0, width, height);
+            rt.draw(gfx, 0, 0);
+            gfx.destroy();
+            rt.setVisible(false).setDepth(0).setOrigin(0, 0);
             return rt;
         });
 
@@ -198,14 +189,16 @@ export class LevelSelectScene extends Phaser.Scene {
                 .setStrokeStyle(4, 0x4a4a6a);
             card.add(bg);
 
-            // Accurate thumbnail — render into a small RenderTexture
-            const thumbRT = this._buildLevelSnapshot(level, thumbW, thumbH);
-            thumbRT.setPosition(-thumbW / 2, -cardHeight / 2 + 10);
-            // Add a border around thumbnail
-            const thumbBorder = this.add.rectangle(0, -cardHeight / 2 + 10 + thumbH / 2, thumbW + 4, thumbH + 4, 0x000000, 0)
-                .setStrokeStyle(2, 0x4a4a6a);
-            card.add(thumbBorder);
-            card.add(thumbRT);
+            // Thumbnail: Graphics drawn in card-local coords
+            // Top-left of thumb = (-thumbW/2, -cardHeight/2 + 8)
+            const thumbX = -thumbW / 2;
+            const thumbY = -cardHeight / 2 + 8;
+            const thumbGfx = this.add.graphics();
+            this._drawLevelPreview(thumbGfx, level, thumbX, thumbY, thumbW, thumbH);
+            // Border
+            thumbGfx.lineStyle(2, 0x4a4a6a, 1);
+            thumbGfx.strokeRect(thumbX, thumbY, thumbW, thumbH);
+            card.add(thumbGfx);
 
             // Level name
             const nameText = this.add.text(0, 20, level.name, {
