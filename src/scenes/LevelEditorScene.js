@@ -146,9 +146,10 @@ export class LevelEditorScene extends Phaser.Scene {
 
         this.input.on('pointerup', () => { this._middleDragging = false; });
 
-        // Native wheel event — most reliable cross-browser scroll
+        // Native wheel event — scrolls world cam unless pointer is over toolbar
         this._wheelHandler = (e) => {
             e.preventDefault();
+            if (e.offsetX <= 160) return; // toolbar handles its own scroll
             this.worldCam.scrollX = Phaser.Math.Clamp(
                 this.worldCam.scrollX + e.deltaY * 1.5, 0, this._levelLength
             );
@@ -190,33 +191,51 @@ export class LevelEditorScene extends Phaser.Scene {
     _buildToolbar(toolbarW, H) {
         this._uiObjects = [];
 
+        // Bottom buttons area height
+        const BOTTOM_H = 220;
+        // Tool list area: from title to just above bottom buttons
+        const listTop = 42;
+        const listH = H - BOTTOM_H - listTop;
+
         // Toolbar background
         const bg = this.add.rectangle(toolbarW / 2, H / 2, toolbarW, H, 0x0d0d1e)
             .setScrollFactor(0).setDepth(30);
         this._uiObjects.push(bg);
 
         // Title
-        const title = this.add.text(toolbarW / 2, 18, 'EDITOR', {
+        const title = this.add.text(toolbarW / 2, 14, 'EDITOR', {
             font: 'bold 14px Arial', fill: '#00ffff'
         }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(31);
         this._uiObjects.push(title);
 
+        // Mask rectangle to clip tool list (Phaser graphics mask)
+        const maskGfx = this.make.graphics({ add: false });
+        maskGfx.fillRect(0, listTop, toolbarW, listH);
+        const listMask = maskGfx.createGeometryMask();
+
+        // Tool list scroll state
+        this._toolScrollY = 0;
         this._toolButtons = {};
-        const startY = 50;
         const btnH = 34;
-        const pad = 4;
+        const pad = 3;
+        const itemH = btnH + pad;
+        const totalToolH = TOOLS.length * itemH;
+
+        // Container holds all tool buttons; we scroll it by changing y
+        this._toolListContainer = this.add.container(0, listTop).setScrollFactor(0).setDepth(31);
+        this._toolListContainer.setMask(listMask);
 
         TOOLS.forEach((tool, i) => {
-            const y = startY + i * (btnH + pad);
+            const localY = i * itemH;
             const isActive = tool.id === this.activeTool;
 
-            const btn = this.add.rectangle(toolbarW / 2, y + btnH / 2, toolbarW - 12, btnH,
+            const btn = this.add.rectangle(toolbarW / 2, localY + btnH / 2, toolbarW - 12, btnH,
                 isActive ? 0x2a2a6e : 0x1a1a3e)
-                .setScrollFactor(0).setDepth(31).setInteractive({ useHandCursor: true });
+                .setScrollFactor(0).setInteractive({ useHandCursor: true });
 
-            const lbl = this.add.text(toolbarW / 2, y + btnH / 2, tool.label, {
+            const lbl = this.add.text(toolbarW / 2, localY + btnH / 2, tool.label, {
                 font: '11px Arial', fill: isActive ? '#ffffff' : '#aaaaaa'
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(32);
+            }).setOrigin(0.5).setScrollFactor(0);
 
             btn.on('pointerover', () => {
                 if (this.activeTool !== tool.id) btn.setFillStyle(0x2a2a4e);
@@ -227,11 +246,21 @@ export class LevelEditorScene extends Phaser.Scene {
             btn.on('pointerdown', () => this._selectTool(tool.id));
 
             this._toolButtons[tool.id] = { btn, lbl };
-            this._uiObjects.push(btn, lbl);
+            this._toolListContainer.add([btn, lbl]);
         });
 
+        // Scroll the tool list when mouse wheel is over toolbar
+        this._toolScrollHandler = (e) => {
+            // Only scroll if pointer is in toolbar area
+            if (e.offsetX > toolbarW) return;
+            const maxScroll = Math.max(0, totalToolH - listH);
+            this._toolScrollY = Phaser.Math.Clamp(this._toolScrollY + e.deltaY * 0.5, 0, maxScroll);
+            this._toolListContainer.y = listTop - this._toolScrollY;
+        };
+        this.game.canvas.addEventListener('wheel', this._toolScrollHandler);
+
         // Separator
-        const sep = this.add.rectangle(toolbarW / 2, H - 210, toolbarW - 12, 1, 0x3a3a5e)
+        const sep = this.add.rectangle(toolbarW / 2, H - BOTTOM_H + 5, toolbarW - 12, 1, 0x3a3a5e)
             .setScrollFactor(0).setDepth(31);
         this._uiObjects.push(sep);
 
@@ -284,6 +313,9 @@ export class LevelEditorScene extends Phaser.Scene {
             font: '10px Arial', fill: '#888888'
         }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(32);
         this._uiObjects.push(this._statusText);
+
+        // Ignore tool list container in world cam (after worldCam is set)
+        this.worldCam?.ignore(this._toolListContainer);
     }
 
     _buildNameInput(W, toolbarW) {
@@ -714,6 +746,10 @@ export class LevelEditorScene extends Phaser.Scene {
         if (this._wheelHandler) {
             this.game.canvas.removeEventListener('wheel', this._wheelHandler);
             this._wheelHandler = null;
+        }
+        if (this._toolScrollHandler) {
+            this.game.canvas.removeEventListener('wheel', this._toolScrollHandler);
+            this._toolScrollHandler = null;
         }
     }
 
